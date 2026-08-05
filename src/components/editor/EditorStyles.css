@@ -1,0 +1,978 @@
+/* ===== Notion-Like Editor Styles ===== */
+
+/* Editor Container */
+.notion-editor-container {
+  position: relative;
+  width: 100%;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  overflow: hidden;
+  background: hsl(var(--background));
+  transition: all 200ms ease;
+}
+
+.notion-editor-container:focus-within {
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.15);
+}
+
+/* ProseMirror Editor */
+.notion-editor .tiptap {
+  padding: 24px 56px;
+  min-height: 300px;
+  outline: none;
+  color: hsl(var(--foreground));
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.notion-editor .tiptap>* {
+  position: relative;
+}
+
+/* Block hover highlight */
+.notion-editor .tiptap>*:hover {
+  border-radius: 4px;
+}
+
+/* Placeholder */
+.notion-editor .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: hsl(var(--muted-foreground) / 0.5);
+  pointer-events: none;
+  height: 0;
+  font-style: italic;
+}
+
+.notion-editor .tiptap .is-empty::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: hsl(var(--muted-foreground) / 0.4);
+  pointer-events: none;
+  height: 0;
+}
+
+/* Headings */
+.notion-editor .tiptap h1 {
+  font-size: 2em;
+  font-weight: 700;
+  margin: 1em 0 0.4em;
+  line-height: 1.2;
+  color: hsl(var(--foreground));
+}
+
+.notion-editor .tiptap h2 {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin: 0.8em 0 0.3em;
+  line-height: 1.3;
+  color: hsl(var(--foreground));
+}
+
+.notion-editor .tiptap h3 {
+  font-size: 1.25em;
+  font-weight: 600;
+  margin: 0.6em 0 0.2em;
+  line-height: 1.4;
+  color: hsl(var(--foreground));
+}
+
+/* Paragraphs */
+.notion-editor .tiptap p {
+  margin: 0.2em 0;
+}
+
+/* Lists */
+.notion-editor .tiptap ul,
+.notion-editor .tiptap ol {
+  padding-left: 1.5em;
+  margin: 0.3em 0;
+}
+
+.notion-editor .tiptap li {
+  margin: 0.15em 0;
+}
+
+.notion-editor .tiptap li p {
+  margin: 0;
+}
+
+/* Task List */
+.notion-editor .tiptap ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.notion-editor .tiptap ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.notion-editor .tiptap ul[data-type="taskList"] li label {
+  margin-top: 3px;
+}
+
+.notion-editor .tiptap ul[data-type="taskList"] li label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: hsl(var(--primary));
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+/* Blockquote */
+.notion-editor .tiptap blockquote {
+  border-left: 3px solid hsl(var(--primary));
+  padding-left: 16px;
+  margin: 0.6em 0;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
+
+/* Collapsible Toggle List */
+.notion-editor .tiptap .toggle-list {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  margin: 0.2em 0;
+  padding: 4px 2px;
+  border-radius: 6px;
+  transition: background 0.1s ease;
+}
+
+.notion-editor .tiptap .toggle-list:hover {
+  background: hsl(var(--muted) / 0.5);
+}
+
+.notion-editor .tiptap .toggle-list-header {
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.notion-editor .tiptap .toggle-list-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 4px;
+  color: hsl(var(--muted-foreground));
+  transition: all 0.2s ease;
+}
+
+.notion-editor .tiptap .toggle-list-arrow:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.notion-editor .tiptap .toggle-list-arrow svg {
+  transition: transform 0.2s ease;
+}
+
+.notion-editor .tiptap .toggle-list-arrow.open svg {
+  transform: rotate(90deg);
+}
+
+.notion-editor .tiptap .toggle-list-body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* When collapsed (class on NodeViewWrapper), hide all children except the first one (the title) */
+.notion-editor .tiptap .toggle-closed .toggle-list-content>div>*:not(:first-child) {
+  display: none !important;
+}
+
+/* Style the first child (title) slightly bolder */
+.notion-editor .tiptap .toggle-list-content>div>*:first-child {
+  font-weight: 500;
+  margin: 0;
+}
+
+/* Code Block & Syntax Highlighting */
+.notion-editor .tiptap pre {
+  background: hsl(0 0% 9%);
+  color: hsl(0 0% 90%);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 0.6em 0;
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.875em;
+  line-height: 1.6;
+}
+
+.notion-editor .tiptap pre code {
+  color: inherit;
+  padding: 0;
+  background: none;
+  font-size: 0.8rem;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #616161;
+}
+
+.hljs-variable,
+.hljs-template-variable,
+.hljs-attribute,
+.hljs-tag,
+.hljs-name,
+.hljs-regexp,
+.hljs-link,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: #f98181;
+}
+
+.hljs-number,
+.hljs-meta,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params {
+  color: #fbbc88;
+}
+
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet {
+  color: #b9f18d;
+}
+
+.hljs-title,
+.hljs-section {
+  color: #faf594;
+}
+
+.hljs-keyword,
+.hljs-selector-tag {
+  color: #70cff8;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 700;
+}
+
+/* Inline Code */
+.notion-editor .tiptap code {
+  background: hsl(var(--muted));
+  color: hsl(var(--primary));
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.875em;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* Links */
+.notion-editor .tiptap a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  transition: opacity 200ms;
+}
+
+.notion-editor .tiptap a:hover {
+  opacity: 0.8;
+}
+
+/* Images */
+.notion-editor .tiptap img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 0.8em 0;
+}
+
+/* Horizontal Rule */
+.notion-editor .tiptap hr {
+  border: none;
+  border-top: 1px solid hsl(var(--border));
+  margin: 1.5em 0;
+}
+
+/* Marks */
+.notion-editor .tiptap mark {
+  border-radius: 2px;
+  padding: 1px 2px;
+}
+
+/* Selection */
+.notion-editor .tiptap ::selection {
+  background: hsl(var(--primary) / 0.2);
+}
+
+/* ===== Floating Toolbar ===== */
+.floating-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  max-width: 500px;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px;
+  background: hsl(var(--popover));
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  box-shadow: 0 8px 30px hsl(0 0% 0% / 0.15), 0 2px 8px hsl(0 0% 0% / 0.08);
+  z-index: 50;
+  animation: toolbar-enter 150ms ease-out;
+}
+
+@keyframes toolbar-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Sub-panel that follows the toolbar */
+.floating-toolbar-panel {
+  z-index: 55;
+  pointer-events: auto;
+}
+
+.floating-toolbar .toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: hsl(var(--border));
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+
+.floating-toolbar .toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: all 150ms ease;
+  flex-shrink: 0;
+}
+
+.floating-toolbar .toolbar-btn:hover {
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+.floating-toolbar .toolbar-btn.active {
+  background: hsl(var(--accent));
+  color: hsl(var(--primary));
+}
+
+.floating-toolbar .toolbar-btn:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* Block type button in toolbar */
+.floating-toolbar .block-type-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: all 150ms;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.floating-toolbar .block-type-btn:hover {
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+/* ===== Dropdown Menus ===== */
+.editor-dropdown {
+  position: absolute;
+  min-width: 200px;
+  padding: 6px;
+  background: hsl(var(--popover));
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  box-shadow: 0 8px 30px hsl(0 0% 0% / 0.15), 0 2px 8px hsl(0 0% 0% / 0.08);
+  z-index: 60;
+  animation: dropdown-enter 150ms ease-out;
+}
+
+@keyframes dropdown-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.editor-dropdown .dropdown-label {
+  padding: 6px 10px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: hsl(var(--muted-foreground));
+}
+
+.editor-dropdown .dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 120ms;
+  text-align: left;
+}
+
+.editor-dropdown .dropdown-item:hover,
+.editor-dropdown .dropdown-item.selected {
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+.editor-dropdown .dropdown-item .dropdown-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: hsl(var(--muted-foreground));
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.editor-dropdown .dropdown-item.active {
+  background: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+}
+
+.editor-dropdown .dropdown-item.active .dropdown-icon {
+  color: hsl(var(--primary));
+}
+
+/* ===== Color Picker ===== */
+.color-picker-panel {
+  padding: 12px;
+  min-width: 220px;
+}
+
+.color-picker-panel .color-section-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 8px;
+}
+
+.color-picker-panel .color-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.color-picker-panel .color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 150ms;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.color-picker-panel .color-swatch:hover {
+  transform: scale(1.15);
+  border-color: hsl(var(--foreground) / 0.3);
+}
+
+.color-picker-panel .color-swatch.active {
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.3);
+}
+
+/* ===== Link Editor ===== */
+.link-editor-panel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  min-width: 280px;
+}
+
+.link-editor-panel input {
+  flex: 1;
+  height: 32px;
+  padding: 0 10px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: hsl(var(--foreground));
+  font-size: 13px;
+}
+
+.link-editor-panel input::placeholder {
+  color: hsl(var(--muted-foreground) / 0.5);
+}
+
+.link-editor-panel .link-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: all 150ms;
+}
+
+.link-editor-panel .link-btn:hover {
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+/* ===== Slash Command Menu ===== */
+.slash-menu {
+  position: absolute;
+  min-width: 240px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+  background: hsl(var(--popover));
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  box-shadow: 0 8px 30px hsl(0 0% 0% / 0.15), 0 2px 8px hsl(0 0% 0% / 0.08);
+  z-index: 60;
+  animation: dropdown-enter 150ms ease-out;
+}
+
+.slash-menu .slash-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 120ms;
+  text-align: left;
+}
+
+.slash-menu .slash-item:hover,
+.slash-menu .slash-item.selected {
+  background: hsl(var(--accent));
+}
+
+.slash-menu .slash-item .slash-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  flex-shrink: 0;
+}
+
+.slash-menu .slash-item .slash-label {
+  font-weight: 500;
+}
+
+.slash-menu .slash-item .slash-desc {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+
+.slash-menu .slash-empty {
+  padding: 16px;
+  text-align: center;
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+}
+
+/* ===== Block Handle (Left Gutter) ===== */
+.block-handle-container {
+  position: absolute;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 150ms ease;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.block-handle-container.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.block-handle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: hsl(var(--muted-foreground) / 0.5);
+  cursor: pointer;
+  transition: all 150ms;
+  position: relative;
+}
+
+.block-handle-btn:hover {
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+/* Block being dragged */
+.block-dragging {
+  opacity: 0.4;
+  background: hsl(var(--accent) / 0.5);
+  border-radius: 4px;
+}
+
+/* Drop indicator line */
+.block-drop-indicator {
+  position: absolute;
+  left: 56px;
+  right: 56px;
+  height: 3px;
+  background: hsl(var(--primary));
+  border-radius: 2px;
+  z-index: 20;
+  pointer-events: none;
+  display: none;
+  box-shadow: 0 0 6px hsl(var(--primary) / 0.4);
+}
+
+/* ===== Block Context Menu ===== */
+.block-context-menu {
+  min-width: 220px;
+  max-width: 280px;
+  padding: 6px;
+  background: hsl(var(--popover));
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  box-shadow: 0 8px 30px hsl(0 0% 0% / 0.15), 0 2px 8px hsl(0 0% 0% / 0.08);
+  z-index: 70;
+  animation: dropdown-enter 150ms ease-out;
+}
+
+/* Block type label at top */
+.block-context-menu .context-type-label {
+  padding: 6px 10px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  border-bottom: 1px solid hsl(var(--border));
+  margin-bottom: 4px;
+}
+
+.block-context-menu .context-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 120ms;
+  text-align: left;
+}
+
+.block-context-menu .context-item:hover,
+.block-context-menu .context-item.active {
+  background: hsl(var(--accent));
+}
+
+.block-context-menu .context-item .context-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  color: hsl(var(--muted-foreground));
+}
+
+.block-context-menu .context-item.justify-between {
+  justify-content: space-between;
+}
+
+.block-context-menu .context-item .context-shortcut {
+  margin-left: auto;
+  font-size: 11px;
+  color: hsl(var(--muted-foreground) / 0.6);
+}
+
+.block-context-menu .context-divider {
+  height: 1px;
+  background: hsl(var(--border));
+  margin: 4px 0;
+}
+
+.block-context-menu .context-item.danger:hover {
+  background: hsl(0 84% 60% / 0.1);
+  color: hsl(0 84% 60%);
+}
+
+/* Submenu (Color picker / Turn Into inline) */
+.block-context-menu .context-submenu {
+  padding: 4px 6px;
+  border-top: 1px solid hsl(var(--border));
+  margin-top: 2px;
+  animation: dropdown-enter 120ms ease-out;
+}
+
+/* Side Submenu (Tiptap Toolkit style) */
+.block-context-menu .context-submenu-side {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  /* Pop out to the right */
+  margin-left: 8px;
+  animation: dropdown-side-enter 150ms ease-out;
+}
+
+@keyframes dropdown-side-enter {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ===== Character Count ===== */
+.editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-top: 1px solid hsl(var(--border));
+  background: hsl(var(--muted) / 0.1);
+}
+
+.editor-footer .char-count {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== Scrollbar ===== */
+.notion-editor::-webkit-scrollbar {
+  width: 6px;
+}
+
+.notion-editor::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.notion-editor::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.2);
+  border-radius: 3px;
+}
+
+.notion-editor::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.35);
+}
+
+/* Tiptap Table Styles */
+.tiptap .tableWrapper {
+  margin: 1.5rem -24px;
+  padding: 24px;
+  /* 24px on all sides provides room for row/col handles and edge menus */
+  /* Room for left row handles and top col handles */
+  overflow-x: auto;
+  position: relative;
+}
+
+.tiptap table {
+  border-collapse: collapse;
+  margin: 0;
+  width: 100%;
+  overflow: visible;
+}
+
+.tiptap table td,
+.tiptap table th {
+  min-width: 75px;
+  border: 1px solid hsl(var(--border) / 0.5);
+  padding: 8px 12px;
+  vertical-align: top;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.tiptap table th {
+  font-weight: 600;
+  text-align: left;
+  background-color: hsl(var(--muted) / 0.5);
+}
+
+.tiptap .selectedCell:after {
+  z-index: 2;
+  position: absolute;
+  content: "";
+  left: -1px;
+  right: -1px;
+  top: -1px;
+  bottom: -1px;
+  background: hsl(var(--primary) / 0.1);
+  border: 2px solid hsl(var(--primary));
+  pointer-events: none;
+}
+
+.tiptap .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  background-color: hsl(var(--primary));
+  pointer-events: none;
+}
+
+/* Custom Table Drag Handles */
+.tiptap table {
+  /* Override so handles positioned relative to table structure can break outside the table cell overflow without clipping */
+  overflow: visible;
+}
+
+.table-row-handle,
+.table-col-handle {
+  position: absolute;
+  z-index: 50;
+  width: 20px;
+  height: 20px;
+  background-color: hsl(var(--background));
+  border: 1px solid hsl(var(--border) / 0.4);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.tiptap .table-row-handle.active,
+.tiptap .table-col-handle.active,
+.tiptap .table-row-handle.hovered,
+.tiptap .table-col-handle.hovered,
+.tiptap .table-row-handle:hover,
+.tiptap .table-col-handle:hover,
+.tiptap table tr td.selectedCell:first-child .table-row-handle,
+.tiptap table tr th.selectedCell:first-child .table-row-handle,
+.tiptap table tr:first-child td.selectedCell .table-col-handle,
+.tiptap table tr:first-child th.selectedCell .table-col-handle {
+  opacity: 1;
+}
+
+.table-row-handle:hover,
+.table-col-handle:hover {
+  background-color: hsl(var(--muted) / 0.8);
+  border-color: hsl(var(--border));
+}
+
+/* Row handles sit on the left of the very first cell in each row */
+.tiptap table tr td:first-child .table-row-handle,
+.tiptap table tr th:first-child .table-row-handle {
+  left: -24px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Column handles sit on top of every cell in the first row */
+.tiptap table tr:first-child td .table-col-handle,
+.tiptap table tr:first-child th .table-col-handle {
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.tiptap p {
+  margin: 0;
+}
+
+/* --- Iframe Embeds (Twitter, Maps, etc.) --- */
+.tiptap .iframe-embed {
+  position: relative;
+  width: 100%;
+  margin: 1rem 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border) / 0.4);
+  background: hsl(var(--muted) / 0.2);
+}
+
+.tiptap .iframe-embed iframe {
+  display: block;
+  width: 100%;
+  min-height: 350px;
+  border: none;
+  border-radius: 8px;
+}
+
+.tiptap .iframe-embed.ProseMirror-selectednode {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+}

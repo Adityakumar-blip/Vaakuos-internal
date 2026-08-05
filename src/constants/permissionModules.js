@@ -1,4 +1,4 @@
-import { AGENCY_MODULES, BRAND_MODULES, OWNER_MODULES } from '@/config/modules.config';
+import { INTERNAL_MODULES } from '@/config/modules.config';
 import { getPermissionGroupsByTenantType, permissionGroups } from './permissionGroups';
 
 const actionLabels = {
@@ -59,9 +59,7 @@ const toPermissionModule = (group) => ({
 });
 
 const moduleSets = {
-  brand: BRAND_MODULES,
-  agency: AGENCY_MODULES,
-  owner: OWNER_MODULES,
+  owner: INTERNAL_MODULES,
 };
 
 const appPermissionGroupIds = [

@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import { AppLayout } from "./components/layout/AppLayout";
+import { DashboardLayout } from "./components/layout/DashboardLayout";
 import { AuthProvider } from "./context/AuthContext";
 import { moduleRoutes, notFoundRoute } from "./pages/routes";
 import { AppRoute } from "./types/router";
@@ -13,6 +13,7 @@ import { ThemeProvider } from "./context/ThemeContext";
 import { SpotlightProvider } from "./context/SpotlightContext";
 import { SidebarProvider } from "./context/SidebarContext";
 import { PermissionGuard } from "./components/auth/PermissionGuard";
+import { SpotlightSearch } from "./components/SpotlightSearch";
 
 const queryClient = new QueryClient();
 
@@ -20,7 +21,7 @@ const wrapRouteElement = (route: AppRoute) => {
   let element = route.element;
 
   if (route.useDashboardLayout) {
-    element = <AppLayout>{element}</AppLayout>;
+    element = <DashboardLayout>{element}</DashboardLayout>;
   }
 
   if (route.permission) {
@@ -55,6 +56,7 @@ const App = () => (
               <Toaster />
               <Sonner />
               <BrowserRouter>
+                <SpotlightSearch />
                 <Routes>
                   {renderRoutes(moduleRoutes)}
                   <Route path={notFoundRoute.path} element={wrapRouteElement(notFoundRoute)} />

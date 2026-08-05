@@ -35,6 +35,8 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "localhost",
     port: 8090,
+    // Drifting to a free port silently falls outside the backend CORS allowlist.
+    strictPort: true,
     allowedHosts: ["localhost", "vaakuos.local", "vaakuos.com"],
   },
   plugins: [react()],
