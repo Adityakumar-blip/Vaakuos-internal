@@ -1,0 +1,60 @@
+.elastic-scroll-container {
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+/* scrollable area - HIDE scrollbar by default */
+.elastic-scroll-content {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
+  
+  /* Firefox - completely hide */
+  scrollbar-width: none;
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* Webkit browsers - COMPLETELY HIDE by default */
+.elastic-scroll-content::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.elastic-scroll-content::-webkit-scrollbar-thumb {
+  background: transparent;
+  display: none;
+}
+
+.elastic-scroll-content::-webkit-scrollbar-track {
+  background: transparent;
+  display: none;
+}
+
+/* ONLY show minimal scrollbar when actively scrolling */
+.show-scrollbar {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: rgba(100, 100, 100, 0.25) transparent;
+}
+
+.show-scrollbar::-webkit-scrollbar {
+  width: 2px;
+  display: block;
+}
+
+.show-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(100, 100, 100, 0.25);
+  border-radius: 10px;
+  display: block;
+}
+
+.show-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 100, 100, 0.4);
+}
+
+.show-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  display: block;
+}

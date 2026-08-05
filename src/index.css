@@ -1,0 +1,369 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ------------------------------------------------------------
+       BRAND CONFIGURAION (SCALABLE ARCHITECTURE)
+       Change these values to update the brand identity globally.
+    ------------------------------------------------------------ */
+    --brand-primary: 152 39% 27%;
+    /* Deep Green */
+    --brand-primary-fg: 0 0% 100%;
+    /* White text on green */
+
+    --brand-secondary: 14 85% 54%;
+    /* Orange Accent */
+
+    /* ------------------------------------------------------------
+       FONTS
+    ------------------------------------------------------------ */
+    --font-sans: "General Sans", system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", monospace;
+
+    /* ------------------------------------------------------------
+       BASE SURFACES (Light - Minimal/Clean)
+    ------------------------------------------------------------ */
+    --background: 240 5% 96%;
+    /* Slightly off-white background */
+    --foreground: 240 10% 9%;
+    /* Softer dark for less harsh contrast */
+
+    --card: 0 0% 100%;
+    /* Pure white cards */
+    --card-foreground: 240 10% 9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 9%;
+
+    /* ------------------------------------------------------------
+       SEMANTIC UI COLORS
+    ------------------------------------------------------------ */
+
+    /* Primary - Mapped to Brand Color */
+    --primary: var(--brand-primary);
+    --primary-foreground: var(--brand-primary-fg);
+    --primary-hover: 152 39% 22%;
+    /* Slightly darker for hover */
+
+    /* Secondary - Light Neutral (for minimal look) */
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --secondary-hover: 240 4.8% 90%;
+
+    /* Muted - Subtle backgrounds */
+    --muted: 240 4.8% 92%;
+    /* Slightly darker muted background */
+    --muted-foreground: 240 3.8% 35%;
+    /* Darkened muted text for much better readability */
+
+    /* Accent - Used for hover states on ghost buttons, kept neutral for minimalism */
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --accent-hover: 240 4.8% 92%;
+
+    /* Destructive */
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* Tertiary - Missing in original but used in button.tsx */
+    --tertiary: 240 4.8% 95.9%;
+    --tertiary-foreground: 240 5.9% 10%;
+    --tertiary-hover: 240 4.8% 92%;
+
+    /* Borders & Inputs - Balanced for visibility and clean look */
+    --border: 240 5.9% 80%;
+    --input: 240 5.9% 80%;
+
+    /* Ring - Use Brand Color for focus rings */
+    --ring: var(--brand-primary);
+
+    --radius: 0.6rem;
+
+    /* ------------------------------------------------------------
+       SIDEBAR (Light - Minimal)
+    ------------------------------------------------------------ */
+    --sidebar-background: 240 4.8% 95.5%;
+    --sidebar-foreground: 240 5.9% 20%;
+    --sidebar-primary: var(--brand-primary);
+    --sidebar-primary-foreground: var(--brand-primary-fg);
+    --sidebar-accent: 240 4.8% 94%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 240 5.9% 80%;
+    --sidebar-ring: var(--brand-primary);
+    --sidebar-hover: 240 4.8% 92%;
+    /* Active item reads as a chip lifted off the recessed track, not a darker
+       swatch on it — so it matches the content panel's surface. */
+    --sidebar-active: 0 0% 100%;
+    --sidebar-active-foreground: 240 5.9% 10%;
+
+    /* ------------------------------------------------------------
+       SHADOWS
+    ------------------------------------------------------------ */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+    /* ------------------------------------------------------------
+       ANIMATIONS
+    ------------------------------------------------------------ */
+    --spring-duration: 0.4s;
+    --spring-bounce: 0.4;
+
+    /* ------------------------------------------------------------
+       TYPOGRAPHY (Subtle & Precise)
+    ------------------------------------------------------------ */
+    --fs-h1: 1.5rem;
+    /* 24px - Subtle leading title */
+    --fs-h2: 1.25rem;
+    /* 20px - Secondary title */
+    --fs-h3: 1.125rem;
+    /* 18px - Section header */
+    --fs-h4: 1rem;
+    /* 16px - Large text/Sub-header */
+    --fs-p: 0.8125rem;
+    /* 13px - Ultra-clean body text */
+    --fs-p-lg: 0.875rem;
+    /* 14px - Standard body text */
+    --fs-small: 0.75rem;
+    /* 12px - Labels and captions */
+  }
+
+  /* ============================================================
+     DARK MODE
+  ============================================================ */
+  .dark {
+    /* Brand Colors in Dark Mode */
+    --brand-primary: 152 39% 27%;
+    --primary-hover: 152 39% 32%;
+
+    /* Panel is the deepest surface; the sidebar sits on the same plane as cards
+       so the chrome blends with the content instead of framing it. Hue tracks
+       the brand green rather than 240 blue — that slate cast read as gray. */
+    --background: 155 8% 9%;
+    --foreground: 0 0% 98%;
+    /* Pure white text */
+
+    --card: 155 7% 13%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 155 7% 13%;
+    --popover-foreground: 0 0% 98%;
+
+    /* Primary */
+    --primary: var(--brand-primary);
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 155 6% 19%;
+    --secondary-foreground: 0 0% 98%;
+    --secondary-hover: 155 6% 24%;
+
+    --muted: 155 6% 19%;
+    --muted-foreground: 155 5% 70%;
+    /* Labeled up text for readability */
+
+    --accent: 155 6% 19%;
+    --accent-foreground: 0 0% 98%;
+    --accent-hover: 155 6% 24%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --tertiary: 155 6% 19%;
+    --tertiary-foreground: 0 0% 98%;
+    --tertiary-hover: 155 6% 24%;
+
+    --border: 155 6% 21%;
+    --input: 155 6% 21%;
+    --ring: var(--brand-primary);
+
+    --sidebar-background: 155 7% 13%;
+    --sidebar-foreground: 155 5% 90%;
+    --sidebar-primary: var(--brand-primary);
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 155 6% 19%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 155 6% 20%;
+    --sidebar-ring: var(--brand-primary);
+    --sidebar-hover: 155 6% 18%;
+    --sidebar-active: 155 7% 23%;
+    --sidebar-active-foreground: 0 0% 98%;
+  }
+
+  /* Force light theme class */
+  .light {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: var(--brand-primary);
+    --primary-foreground: var(--brand-primary-fg);
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 35%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --border: 240 5.9% 80%;
+    --input: 240 5.9% 80%;
+    --ring: var(--brand-primary);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    font-size: var(--fs-p-lg);
+    line-height: 1.5;
+  }
+
+  html {
+    /* Improves scrolling experience */
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border/50 rounded-full hover:bg-muted-foreground/30 transition-colors;
+  }
+
+  /* Stealth Scroll - Ultra thin and subtle */
+  .stealth-scroll::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  .stealth-scroll::-webkit-scrollbar-thumb {
+    @apply bg-border/30 rounded-full hover:bg-border/60 transition-colors;
+  }
+
+  .stealth-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* Selection text color - matches brand */
+  ::selection {
+    @apply bg-primary/20 text-primary;
+  }
+
+  /* Make headings feel more precise and subtle */
+  h1 {
+    font-size: var(--fs-h1);
+    @apply tracking-tight font-semibold leading-tight;
+  }
+
+  h2 {
+    font-size: var(--fs-h2);
+    @apply tracking-tight font-semibold leading-snug;
+  }
+
+  h3 {
+    font-size: var(--fs-h3);
+    @apply tracking-tight font-semibold leading-normal;
+  }
+
+  h4 {
+    font-size: var(--fs-h4);
+    @apply tracking-tight font-semibold leading-normal;
+  }
+
+  p {
+    font-size: var(--fs-p);
+    @apply leading-relaxed text-muted-foreground/90;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply text-foreground;
+  }
+
+  /* Premium hover effect utility */
+  .hover-lift {
+    @apply transition-transform duration-300 ease-out;
+  }
+
+  .hover-lift:hover {
+    @apply -translate-y-0.5;
+  }
+
+  .glass-card {
+    @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-xl;
+  }
+
+  /* Stretch Animations for Elastic Scroll */
+  @keyframes stretch-top {
+    0% {
+      transform: translateY(0) scaleY(1);
+      transform-origin: top;
+    }
+
+    50% {
+      transform: translateY(10px) scaleY(1.02);
+      transform-origin: top;
+    }
+
+    100% {
+      transform: translateY(0) scaleY(1);
+      transform-origin: top;
+    }
+  }
+
+  @keyframes stretch-bottom {
+    0% {
+      transform: translateY(0) scaleY(1);
+      transform-origin: bottom;
+    }
+
+    50% {
+      transform: translateY(-10px) scaleY(1.02);
+      transform-origin: bottom;
+    }
+
+    100% {
+      transform: translateY(0) scaleY(1);
+      transform-origin: bottom;
+    }
+  }
+
+  /* Global Fix for Jittery Text during Transformations */
+  .transform-fix {
+    backface-visibility: hidden;
+    -webkit-font-smoothing: antialiased;
+    transform: translateZ(0);
+  }
+
+  /* Browser Autofill Theme Fix */
+  /* input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px hsl(var(--background)) inset !important;
+    -webkit-text-fill-color: hsl(var(--foreground)) !important;
+    caret-color: hsl(var(--foreground)) !important;
+    transition: background-color 5000s ease-in-out 0s;
+  } */
+}
