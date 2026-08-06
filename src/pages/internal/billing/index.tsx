@@ -1,200 +1,389 @@
-import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useMemo, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CreditCard, DollarSign, ArrowUpRight, ArrowDownRight, Download, FileText } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
-import { useGetFinanceStatsQuery } from '@/store/api/financeApi';
-import { Loader2 } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { DataTable, type Column } from '@/components/ui/data-table';
+import { SearchInput } from '@/components/common/SearchInput';
+import {
+    AddFilterButton,
+    FilterPills,
+    useDataFilters,
+    type FilterField,
+} from '@/components/common/filters';
+import {
+    ArrowDownRight,
+    ArrowUpRight,
+    Building2,
+    CircleDot,
+    CreditCard,
+    Download,
+    FileText,
+    IndianRupee,
+} from 'lucide-react';
+import { useSearch } from '@/hooks/useSearch';
+import { usePaginationState } from '@/hooks/usePaginationState';
+import {
+    useGetBrandBillingQuery,
+    useGetFinanceStatsQuery,
+    useGetOwnerInvoicesQuery,
+    type BrandBilling,
+} from '@/store/api/financeApi';
 import { formatCurrency, formatNumber } from '@/utils/format';
 
-const OwnerBilling = () => {
-    const { data: stats, isLoading, isError } = useGetFinanceStatsQuery();
+const LOCALE = 'en-IN';
 
-    const statsCurrency = stats?.totalRevenue.currency || 'INR';
-    const statsLocale = 'en-IN';
-
-    if (isLoading) {
-        return (
-            <div className="flex h-[400px] items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        );
-    }
-
-    return (
-        <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">Billing & Finance</h1>
-                <p className="text-muted-foreground mt-2">Manage subscriptions, invoices, and financial overview.</p>
-            </div>
-
-            {/* Summary Cards */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{formatCurrency(stats?.totalRevenue.value || 0, statsCurrency, statsLocale)}</div>
-                        <p className="text-xs text-muted-foreground">
-                            <span className={`${(stats?.totalRevenue.growth || 0) >= 0 ? 'text-green-500' : 'text-red-500'} flex items-center`}>
-                                {(stats?.totalRevenue.growth || 0) >= 0 ? '+' : ''}{stats?.totalRevenue.growth}% 
-                                {(stats?.totalRevenue.growth || 0) >= 0 ? <ArrowUpRight className="h-4 w-4 inline ml-1" /> : <ArrowDownRight className="h-4 w-4 inline ml-1" />}
-                            </span>{' '}
-                            from last month
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Active Subscriptions</CardTitle>
-                        <CreditCard className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{formatNumber(stats?.activeSubscriptions.value || 0, statsLocale)}</div>
-                        <p className="text-xs text-muted-foreground">
-                            <span className={`${(stats?.activeSubscriptions.growth || 0) >= 0 ? 'text-green-500' : 'text-red-500'} flex items-center`}>
-                                {(stats?.activeSubscriptions.growth || 0) >= 0 ? '+' : ''}{stats?.activeSubscriptions.growth}% 
-                                {(stats?.activeSubscriptions.growth || 0) >= 0 ? <ArrowUpRight className="h-4 w-4 inline ml-1" /> : <ArrowDownRight className="h-4 w-4 inline ml-1" />}
-                            </span>{' '}
-                            from last month
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Pending Invoices</CardTitle>
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{formatNumber(stats?.pendingInvoices.value || 0, statsLocale)}</div>
-                        <p className="text-xs text-muted-foreground">
-                            <span className={`${(stats?.pendingInvoices.growth || 0) >= 0 ? 'text-green-500' : 'text-red-500'} flex items-center`}>
-                                {(stats?.pendingInvoices.growth || 0) >= 0 ? '+' : ''}{stats?.pendingInvoices.growth}% 
-                                {(stats?.pendingInvoices.growth || 0) >= 0 ? <ArrowUpRight className="h-4 w-4 inline ml-1" /> : <ArrowDownRight className="h-4 w-4 inline ml-1" />}
-                            </span>{' '}
-                            from last month
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Avg. Revenue / User</CardTitle>
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{formatCurrency(stats?.arpu.value || 0, statsCurrency, statsLocale)}</div>
-                        <p className="text-xs text-muted-foreground">
-                            <span className={`${(stats?.arpu.growth || 0) >= 0 ? 'text-green-500' : 'text-red-500'} flex items-center`}>
-                                {(stats?.arpu.growth || 0) >= 0 ? '+' : ''}{stats?.arpu.growth}% 
-                                {(stats?.arpu.growth || 0) >= 0 ? <ArrowUpRight className="h-4 w-4 inline ml-1" /> : <ArrowDownRight className="h-4 w-4 inline ml-1" />}
-                            </span>{' '}
-                            from last month
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <Tabs defaultValue="invoices" className="space-y-4">
-                <TabsList>
-                    <TabsTrigger value="invoices">Invoices</TabsTrigger>
-                    <TabsTrigger value="methods">Payment Methods</TabsTrigger>
-                    <TabsTrigger value="settings">Billing Settings</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="invoices" className="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Recent Invoices</CardTitle>
-                            <CardDescription>
-                                A list of recent invoices for your system.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-8">
-                                {[
-                                    { id: 'INV001', amount: '$250.00', status: 'Paid', date: '2024-01-15' },
-                                    { id: 'INV002', amount: '$150.00', status: 'Pending', date: '2024-01-16' },
-                                    { id: 'INV003', amount: '$450.00', status: 'Paid', date: '2024-01-14' },
-                                    { id: 'INV004', amount: '$120.00', status: 'Failed', date: '2024-01-12' },
-                                    { id: 'INV005', amount: '$300.00', status: 'Paid', date: '2024-01-10' },
-                                ].map((invoice, i) => (
-                                    <div key={i} className="flex items-center">
-                                        <div className="grid gap-1 flex-1">
-                                            <p className="text-sm font-medium leading-none">
-                                                Invoice #{invoice.id}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {invoice.date}
-                                            </p>
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                            <Badge variant={invoice.status === 'Paid' ? 'outline' : invoice.status === 'Pending' ? 'secondary' : 'destructive'} className={invoice.status === 'Paid' ? 'border-green-500 text-green-500' : ''}>
-                                                {invoice.status}
-                                            </Badge>
-                                            <div className="w-[80px] text-right font-medium">{invoice.amount}</div>
-                                            <Button variant="ghost" size="icon">
-                                                <Download className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                <TabsContent value="methods">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Payment Methods</CardTitle>
-                            <CardDescription>Manage your payment methods.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex items-center justify-between p-4 border rounded-lg">
-                                <div className="flex items-center gap-4">
-                                    <div className="h-10 w-16 bg-slate-100 dark:bg-slate-800 rounded flex items-center justify-center">
-                                        <CreditCard className="h-6 w-6" />
-                                    </div>
-                                    <div>
-                                        <p className="font-medium">Visa ending in 4242</p>
-                                        <p className="text-sm text-muted-foreground">Expiry 12/2025</p>
-                                    </div>
-                                </div>
-                                <Badge>Default</Badge>
-                            </div>
-                            <div className="flex items-center justify-between p-4 border rounded-lg">
-                                <div className="flex items-center gap-4">
-                                    <div className="h-10 w-16 bg-slate-100 dark:bg-slate-800 rounded flex items-center justify-center">
-                                        <CreditCard className="h-6 w-6" />
-                                    </div>
-                                    <div>
-                                        <p className="font-medium">Mastercard ending in 8888</p>
-                                        <p className="text-sm text-muted-foreground">Expiry 08/2026</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                <TabsContent value="settings">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Billing Settings</CardTitle>
-                            <CardDescription>Configure billing preferences.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-muted-foreground">Billing settings content placeholder.</p>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-            </Tabs>
-        </div>
-    );
+const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+    paid: 'default',
+    pending: 'secondary',
+    failed: 'destructive',
+    void: 'outline',
 };
 
-export default OwnerBilling;
+export default function OwnerBilling() {
+    const [openBrand, setOpenBrand] = useState<BrandBilling | null>(null);
+
+    const { pageSize, pageIndex, setPageSize, setPageIndex } = usePaginationState({
+        defaultPageSize: 10,
+        defaultPageIndex: 0,
+    });
+
+    const { search, handleSearchChange, debouncedSearch } = useSearch({
+        onSearchChange: () => setPageIndex(0),
+    });
+
+    const { data: stats, isLoading: statsLoading } = useGetFinanceStatsQuery();
+    const { data: billing, isLoading, error, refetch } = useGetBrandBillingQuery({
+        search: debouncedSearch || undefined,
+    });
+
+    const currency = billing?.currency || stats?.totalRevenue.currency || 'INR';
+    const money = (value: number) => formatCurrency(value, currency, LOCALE);
+
+    const brands = useMemo(() => billing?.brands ?? [], [billing]);
+
+    const filterFields: FilterField<BrandBilling>[] = useMemo(() => [
+        {
+            id: 'agency',
+            label: 'Agency',
+            icon: Building2,
+            type: 'select',
+            searchable: true,
+            accessor: (r) => r.agencyId ?? 'direct',
+            options: Array.from(
+                new Map(brands.map((b) => [b.agencyId ?? 'direct', b.agencyName])).entries(),
+            ).map(([value, label]) => ({ label, value })),
+        },
+        {
+            id: 'billing',
+            label: 'Billing',
+            icon: CircleDot,
+            type: 'select',
+            accessor: (r) => (r.outstanding > 0 ? 'outstanding' : r.invoiceCount ? 'settled' : 'none'),
+            options: [
+                { label: 'Outstanding', value: 'outstanding', dot: 'bg-red-500' },
+                { label: 'Settled', value: 'settled', dot: 'bg-emerald-500' },
+                { label: 'Not billed', value: 'none', dot: 'bg-zinc-400' },
+            ],
+        },
+    ], [brands]);
+
+    const filters = useDataFilters<BrandBilling>(filterFields);
+    const visibleRows = useMemo(() => filters.apply(brands), [brands, filters.predicate]);
+
+    // Server totals cover every brand; recompute when a filter narrows the set.
+    const totals = useMemo(() => {
+        if (filters.activeCount === 0 && billing) return billing.totals;
+        return visibleRows.reduce(
+            (acc, r) => ({
+                billed: acc.billed + r.billed,
+                collected: acc.collected + r.collected,
+                outstanding: acc.outstanding + r.outstanding,
+                brands: acc.brands + 1,
+            }),
+            { billed: 0, collected: 0, outstanding: 0, brands: 0 },
+        );
+    }, [billing, visibleRows, filters.activeCount]);
+
+    const summary = [
+        {
+            label: 'Revenue This Month',
+            icon: IndianRupee,
+            value: statsLoading ? '—' : money(stats?.totalRevenue.value || 0),
+            growth: stats?.totalRevenue.growth,
+        },
+        {
+            label: 'Collected',
+            icon: IndianRupee,
+            value: money(totals.collected),
+        },
+        {
+            label: 'Outstanding',
+            icon: FileText,
+            value: money(totals.outstanding),
+            className: totals.outstanding > 0 ? 'text-red-600' : undefined,
+        },
+        {
+            label: 'Active Subscriptions',
+            icon: CreditCard,
+            value: statsLoading ? '—' : formatNumber(stats?.activeSubscriptions.value || 0, LOCALE),
+            growth: stats?.activeSubscriptions.growth,
+        },
+    ];
+
+    const columns: Column<BrandBilling>[] = [
+        {
+            accessorKey: 'brandName',
+            header: 'Brand',
+            cell: ({ row }) => (
+                <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-full bg-primary/10 text-primary">
+                        <Building2 size={16} />
+                    </div>
+                    <div>
+                        <p className="font-medium text-foreground">{row.original.brandName}</p>
+                        <p className="text-xs text-muted-foreground">{row.original.agencyName}</p>
+                    </div>
+                </div>
+            ),
+        },
+        {
+            accessorKey: 'planName',
+            header: 'Plan',
+            cell: ({ row }) => (
+                <div className="space-y-1">
+                    <p className="text-sm">{row.original.planName}</p>
+                    <Badge variant="outline" className="capitalize font-normal">
+                        {row.original.subscriptionStatus}
+                    </Badge>
+                </div>
+            ),
+        },
+        {
+            accessorKey: 'invoiceCount',
+            header: 'Invoices',
+            cell: ({ row }) => <span className="tabular-nums">{row.original.invoiceCount}</span>,
+        },
+        {
+            accessorKey: 'billed',
+            header: 'Billed',
+            cell: ({ row }) => <span className="tabular-nums">{money(row.original.billed)}</span>,
+        },
+        {
+            accessorKey: 'collected',
+            header: 'Collected',
+            cell: ({ row }) => (
+                <span className="tabular-nums text-green-600">{money(row.original.collected)}</span>
+            ),
+        },
+        {
+            accessorKey: 'outstanding',
+            header: 'Outstanding',
+            cell: ({ row }) => (
+                <span className={`tabular-nums ${row.original.outstanding > 0 ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
+                    {money(row.original.outstanding)}
+                </span>
+            ),
+        },
+        {
+            accessorKey: 'lastInvoiceAt',
+            header: 'Last Invoice',
+            cell: ({ row }) => (
+                <span className="text-sm text-muted-foreground">
+                    {row.original.lastInvoiceAt
+                        ? new Date(row.original.lastInvoiceAt).toLocaleDateString()
+                        : '—'}
+                </span>
+            ),
+        },
+        {
+            id: 'actions',
+            header: () => <div className="text-right">Actions</div>,
+            enableSorting: false,
+            cell: ({ row }) => (
+                <div className="flex justify-end">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={row.original.invoiceCount === 0}
+                        onClick={() => setOpenBrand(row.original)}
+                    >
+                        View invoices
+                    </Button>
+                </div>
+            ),
+        },
+    ];
+
+    return (
+        <div className="space-y-6 pt-4">
+            <div>
+                <h1 className="text-2xl font-semibold text-foreground">Billing &amp; Finance</h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                    Revenue and invoices per brand across all agencies.
+                </p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {summary.map(({ label, icon: Icon, value, growth, className }) => (
+                    <Card key={label}>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">{label}</CardTitle>
+                            <Icon className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className={`text-2xl font-bold ${className ?? ''}`}>{value}</div>
+                            {growth !== undefined && <GrowthNote growth={growth} />}
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+
+            {/* Search + Filters */}
+            <div className="flex items-center gap-2">
+                <SearchInput
+                    value={search}
+                    onValueChange={handleSearchChange}
+                    placeholder="Search brands..."
+                />
+                <AddFilterButton fields={filterFields} active={filters.filters} onSet={filters.setFilter} />
+            </div>
+
+            <p className="text-sm text-muted-foreground">
+                {formatNumber(totals.brands, LOCALE)} brands · Billed{' '}
+                <span className="font-medium text-foreground">{money(totals.billed)}</span> · Collected{' '}
+                <span className="font-medium text-green-600">{money(totals.collected)}</span> · Outstanding{' '}
+                <span className={`font-medium ${totals.outstanding > 0 ? 'text-red-600' : 'text-foreground'}`}>
+                    {money(totals.outstanding)}
+                </span>
+            </p>
+
+            <DataTable
+                columns={columns}
+                data={visibleRows}
+                toolbar={filters.activeCount > 0 ? <FilterPills controller={filters} /> : undefined}
+                isLoading={isLoading}
+                error={error}
+                onRetry={refetch}
+                emptyMessage="No brands found"
+                emptyDescription="Brands billed through the platform will appear here."
+                showPagination
+                pageSize={pageSize}
+                initialPageIndex={pageIndex}
+                onPageIndexChange={setPageIndex}
+                onPageSizeChange={(size) => {
+                    setPageSize(size);
+                    setPageIndex(0);
+                }}
+            />
+
+            <BrandInvoicesSheet brand={openBrand} currency={currency} onClose={() => setOpenBrand(null)} />
+        </div>
+    );
+}
+
+function BrandInvoicesSheet({
+    brand,
+    currency,
+    onClose,
+}: {
+    brand: BrandBilling | null;
+    currency: string;
+    onClose: () => void;
+}) {
+    const { data, isLoading } = useGetOwnerInvoicesQuery(
+        { brandId: brand?.brandId, perPage: 100 },
+        { skip: !brand },
+    );
+    const invoices = data?.data ?? [];
+
+    return (
+        <Sheet open={!!brand} onOpenChange={(open) => !open && onClose()}>
+            <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+                <SheetHeader>
+                    <SheetTitle>{brand?.brandName}</SheetTitle>
+                    <SheetDescription>
+                        {brand?.agencyName} · Billed{' '}
+                        {formatCurrency(brand?.billed || 0, currency, LOCALE)} · Outstanding{' '}
+                        {formatCurrency(brand?.outstanding || 0, currency, LOCALE)}
+                    </SheetDescription>
+                </SheetHeader>
+
+                <Table className="mt-6">
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Invoice</TableHead>
+                            <TableHead>Amount</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Due</TableHead>
+                            <TableHead className="text-right">PDF</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {isLoading && (
+                            <TableRow>
+                                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                                    Loading invoices…
+                                </TableCell>
+                            </TableRow>
+                        )}
+                        {invoices.map((invoice) => (
+                            <TableRow key={invoice.id}>
+                                <TableCell>
+                                    <p className="font-mono text-sm">{invoice.invoice_number}</p>
+                                    {invoice.plan_name && (
+                                        <p className="text-xs text-muted-foreground">{invoice.plan_name}</p>
+                                    )}
+                                </TableCell>
+                                <TableCell className="tabular-nums">
+                                    {formatCurrency(invoice.amount, invoice.currency || currency, LOCALE)}
+                                </TableCell>
+                                <TableCell>
+                                    <Badge
+                                        variant={STATUS_VARIANT[invoice.status?.toLowerCase()] ?? 'outline'}
+                                        className="capitalize font-normal"
+                                    >
+                                        {invoice.status}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                    {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '—'}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    {invoice.pdf_url ? (
+                                        <Button variant="ghost" size="icon" asChild>
+                                            <a
+                                                href={invoice.pdf_url}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                aria-label="Download invoice PDF"
+                                            >
+                                                <Download className="h-4 w-4" />
+                                            </a>
+                                        </Button>
+                                    ) : (
+                                        <span className="text-muted-foreground">—</span>
+                                    )}
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </SheetContent>
+        </Sheet>
+    );
+}
+
+function GrowthNote({ growth }: { growth: number }) {
+    const up = growth >= 0;
+    return (
+        <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <span className={`flex items-center ${up ? 'text-green-600' : 'text-red-600'}`}>
+                {up ? '+' : ''}{Math.round(growth)}%
+                {up ? <ArrowUpRight className="h-3 w-3 ml-0.5" /> : <ArrowDownRight className="h-3 w-3 ml-0.5" />}
+            </span>
+            from last month
+        </p>
+    );
+}

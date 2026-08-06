@@ -23,16 +23,18 @@ export interface AgencyOverview {
   createdAt: string;
 }
 
+/** Shape returned by `GET /brands` (BrandsService.findAll). */
 export interface BrandOverview {
   id: string;
   name: string;
-  agencyId: string;
+  slug: string | null;
+  /** Subscription status: trialing | active | halted | cancelled | inactive | … */
+  status: string;
+  planName: string;
+  agencyId: string | null;
   agencyName: string;
-  whatsappNumber: string;
-  messageVolume: number;
-  blockRate: number;
-  status: 'active' | 'paused';
   createdAt: string;
+  creditsBalance: number;
 }
 
 export interface TemplateModerationItem {

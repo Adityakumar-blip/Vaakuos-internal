@@ -11,6 +11,7 @@ export interface Brand {
   defaultLanguage?: string;
   logo?: string;
   agencyId?: string;
+  status?: 'active' | 'paused';
   createdAt: string;
   updatedAt: string;
 }

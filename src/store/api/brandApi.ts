@@ -37,12 +37,12 @@ export const brandApi = api.injectEndpoints({
             providesTags: (result, error, id) => [{ type: 'Brand', id }],
         }),
 
-        // Update brand
-        updateBrand: builder.mutation<Brand, { id: string; data: Partial<Brand> }>({
-            query: ({ id, data }) => ({
-                url: `/brands/${id}`,
+        // Only the status is writable — the backend exposes no general brand update.
+        updateBrandStatus: builder.mutation<Brand, { id: string; status: string }>({
+            query: ({ id, status }) => ({
+                url: `/brands/${id}/status`,
                 method: 'PATCH',
-                body: data,
+                body: { status },
             }),
             invalidatesTags: (result, error, { id }) => [
                 { type: 'Brand', id: 'LIST' },
@@ -57,5 +57,5 @@ export const {
     useLazyGetBrandsQuery,
     useGetBrandByIdQuery,
     useLazyGetBrandByIdQuery,
-    useUpdateBrandMutation,
+    useUpdateBrandStatusMutation,
 } = brandApi;
