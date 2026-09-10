@@ -17,9 +17,21 @@ export interface ModuleDef {
     label: string;
 }
 
+/**
+ * `unset` is not the same as granted, even though the backend lets it through.
+ *
+ * Failing open is right for enforcement — it stops a new gate locking out plans
+ * that predate it. But a console that draws "nobody decided" the same as
+ * "deliberately granted" hides the one thing the operator needs to act on, and
+ * makes a free plan look identical to the top tier.
+ */
+export type SlotState = 'granted' | 'locked' | 'unset';
+
 export interface ModuleSlot {
     key: string;
     label: string;
+    state: SlotState;
+    /** True where the tenant can use it today, however that came about. */
     granted: boolean;
     /** Granted by a per-tenant override rather than by the plan itself. */
     overridden?: boolean;
@@ -55,9 +67,9 @@ export function useModuleSlots(): ModuleDef[] {
 }
 
 /**
- * Reads a features map the way the backend does: a module key that is absent
- * means granted, because evaluateFeature() fails open on unknown codes. Only an
- * explicit `false` locks a module.
+ * Resolves a features map into per-module state, keeping `unset` distinct from
+ * `granted` so the console can show which plans still need their modules
+ * chosen. Access still matches the backend: unset behaves as granted.
  */
 export function resolveSlots(
     slots: ModuleDef[],
@@ -67,12 +79,21 @@ export function resolveSlots(
     return slots.map((s) => {
         const base = features?.[s.code];
         const override = overrides?.[s.code];
-        const granted = override !== undefined ? override === true : base !== false;
+        const effective = override !== undefined ? override : base;
+
+        const state: SlotState =
+            effective === undefined ? 'unset' : effective === true ? 'granted' : 'locked';
+
         return {
             key: s.key,
             label: s.label,
-            granted,
+            state,
+            granted: state !== 'locked',
             overridden: override !== undefined && override !== base,
         };
     });
 }
+
+/** True when a licence has not had its modules decided at all. */
+export const modulesUnset = (slots: ModuleSlot[]) =>
+    slots.length > 0 && slots.every((s) => s.state === 'unset');

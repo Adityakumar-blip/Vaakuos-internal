@@ -10,6 +10,16 @@
  * @param locale - The locale to use for formatting. Defaults to 'en-IN'.
  * @returns A formatted currency string.
  */
+/**
+ * Plan and add-on amounts are stored in the smallest currency unit (paise for
+ * INR) because that is what Razorpay bills in.
+ */
+export const formatPaise = (
+  paise: number,
+  currency: string = "INR",
+  locale: string = "en-IN",
+): string => formatCurrency((paise || 0) / 100, currency, locale);
+
 export const formatCurrency = (
   value: number,
   currency: string = "INR",

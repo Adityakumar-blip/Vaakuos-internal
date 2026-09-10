@@ -35,7 +35,7 @@ import {
     KeyRound
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatCurrency } from '@/utils/format';
+import { formatCurrency, formatPaise } from '@/utils/format';
 import { ModuleStrip } from '@/components/licensing/ModuleStrip';
 import { resolveSlots, useModuleSlots } from '@/components/licensing/modules';
 
@@ -260,12 +260,12 @@ export default function SubscriptionPage() {
                 const yearly = Math.round(monthly * 12 * (1 - discount / 100));
                 return (
                     <div className="flex flex-col gap-0.5">
-                        <span className="text-sm font-medium">
-                            ₹{monthly.toLocaleString('en-IN')}
+                        <span className="text-sm font-medium tabular-nums">
+                            {formatPaise(monthly)}
                             <span className="text-muted-foreground text-xs font-normal">/mo</span>
                         </span>
-                        <span className="text-xs text-muted-foreground">
-                            ₹{yearly.toLocaleString('en-IN')}/yr
+                        <span className="text-xs text-muted-foreground tabular-nums">
+                            {formatPaise(yearly)}/yr
                             {discount > 0 && (
                                 <span className="ml-1 text-green-600 font-medium">(-{discount}%)</span>
                             )}
@@ -382,7 +382,7 @@ export default function SubscriptionPage() {
             header: "Price",
             cell: ({ row }) => (
                 <span className="font-medium">
-                    {formatCurrency(row.original.amount, 'INR', 'en-IN')}
+                    {formatPaise(row.original.amount)}
                     <span className="text-xs text-muted-foreground ml-1">
                         {row.original.type === 'recurring' ? '/mo' : ''}
                     </span>
