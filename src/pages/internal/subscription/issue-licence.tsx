@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ArrowLeft, ArrowRight, Globe, Loader2, Lock, Plus, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -61,10 +61,12 @@ function unwrap<T>(data: unknown): T[] {
 
 export default function IssueLicencePage() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const moduleSlots = useModuleSlots();
 
     const [tenantQuery, setTenantQuery] = useState('');
-    const [tenantId, setTenantId] = useState<string>('');
+    // Arriving from a brand row means the tenant is already decided.
+    const [tenantId, setTenantId] = useState<string>(searchParams.get('tenant') ?? '');
     const [planId, setPlanId] = useState<string>('');
     const [overrides, setOverrides] = useState<Record<string, string | boolean>>({});
     const [note, setNote] = useState('');

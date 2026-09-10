@@ -34,6 +34,11 @@ export interface BrandOverview {
   /** Subscription status as returned by /brands — not a brand lifecycle state. */
   status: string;
   planName?: string;
+  planId?: string | null;
+  planFeatures?: Record<string, string | number | boolean> | null;
+  customLimits?: Record<string, string | number | boolean> | null;
+  trialEndsAt?: string | null;
+  currentPeriodEnd?: string | null;
   createdAt: string;
 }
 
