@@ -31,7 +31,9 @@ export interface BrandOverview {
   whatsappNumber: string;
   messageVolume: number;
   blockRate: number;
-  status: 'active' | 'paused';
+  /** Subscription status as returned by /brands — not a brand lifecycle state. */
+  status: string;
+  planName?: string;
   createdAt: string;
 }
 

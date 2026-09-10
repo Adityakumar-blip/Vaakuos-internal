@@ -30,10 +30,14 @@ import {
     Trash2,
     RefreshCw,
     CheckCircle2,
-    XCircle
+    XCircle,
+    Lock,
+    KeyRound
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/utils/format';
+import { ModuleStrip } from '@/components/licensing/ModuleStrip';
+import { resolveSlots, useModuleSlots } from '@/components/licensing/modules';
 
 const SUBSCRIPTIONS_URL = '/subscriptions/plans';
 const ADDONS_URL = '/subscriptions/addons';
@@ -204,6 +208,8 @@ export default function SubscriptionPage() {
 
 
     // Columns for Subscriptions
+    const moduleSlots = useModuleSlots();
+
     const planColumns: Column<Subscription>[] = [
         {
             id: "select",
@@ -269,33 +275,42 @@ export default function SubscriptionPage() {
             }
         },
         {
-            accessorKey: "description",
-            header: "Description",
+            id: "modules",
+            header: "Modules",
             cell: ({ row }) => (
-                <p className="text-sm text-muted-foreground max-w-xs truncate">{row.original.description}</p>
+                <ModuleStrip
+                    variant="full"
+                    slots={resolveSlots(moduleSlots, row.original.features)}
+                />
             )
         },
         {
             accessorKey: "is_published",
-            header: "Publication",
+            header: "Availability",
             cell: ({ row }) => {
                 const isPublished = row.original.is_published;
                 return (
                     <div>
                         {isPublished ? (
-                            <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200">
-                                <Globe size={12} className="mr-1" />
-                                Published
-                            </Badge>
+                            <span className="inline-flex items-center gap-1.5 text-sm text-foreground">
+                                <Globe size={13} className="text-primary" />
+                                On pricing page
+                            </span>
                         ) : (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 text-xs"
-                                onClick={() => handlePublishClick(row.original.id)}
-                            >
-                                Publish
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                                    <Lock size={13} />
+                                    Private
+                                </span>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                    onClick={() => handlePublishClick(row.original.id)}
+                                >
+                                    Publish
+                                </Button>
+                            </div>
                         )}
                     </div>
                 );
@@ -529,11 +544,17 @@ export default function SubscriptionPage() {
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-semibold text-foreground">Subscriptions & Add-ons</h1>
+                    <h1 className="text-2xl font-semibold text-foreground">Plans and licences</h1>
                     <p className="text-sm text-muted-foreground mt-1">
-                        Manage subscription plans and additional services
+                        Build what a plan grants, then issue it to a customer.
                     </p>
                 </div>
+                {activeTab === 'plans' && (
+                    <Button variant="outline" onClick={() => navigate('/subscription/issue-licence')}>
+                        <KeyRound size={16} className="mr-2" />
+                        Issue a licence
+                    </Button>
+                )}
             </div>
 
             {/* Tabs */}
