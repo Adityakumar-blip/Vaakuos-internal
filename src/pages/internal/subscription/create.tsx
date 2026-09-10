@@ -13,7 +13,9 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { X, ArrowLeft, Loader2, Edit, GripVertical } from 'lucide-react';
+import { ArrowLeft, Loader2, Edit, Lock } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     useGetMastersQuery,
     useGetMasterByIdQuery,
@@ -32,15 +34,23 @@ interface FeatureOption {
     name: string;
     code: string;
     type: 'string' | 'number' | 'boolean';
+    module_key?: string | null;
+    count_model?: string | null;
 }
 
-interface DynamicField {
-    id: string; // unique internal id for list rendering
-    code: string;
-    value: string | number | boolean;
-    type: 'string' | 'number' | 'boolean';
-    name: string; // Display name
+/** Feature code that licenses a whole module. */
+const MODULE_PREFIX = 'module.';
+/** Sentinel matching the backend's UNLIMITED. */
+const UNLIMITED = -1;
+
+interface ModuleGroup {
+    key: string;
+    gate?: FeatureOption;
+    limits: FeatureOption[];
 }
+
+const titleCase = (key: string) =>
+    key.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 
 interface Subscription {
@@ -99,9 +109,13 @@ export default function SubscriptionCreatePage() {
     const watchedDiscount = watch('yearly_discount');
     const yearlyPrice = Math.round(Number(watchedAmount || 0) * 12 * (1 - Number(watchedDiscount || 0) / 100));
 
-    // Dynamic Features State (kept separate for now as it involves complex UI/logic)
-    const [dynamicFields, setDynamicFields] = useState<DynamicField[]>([]);
-    const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+    /**
+     * The licence: which modules this plan grants, and the allowance on each.
+     * Values are kept as raw strings so "no limit stated" ('') stays distinct
+     * from a deliberate 0 — the backend treats those very differently.
+     */
+    const [moduleOn, setModuleOn] = useState<Record<string, boolean>>({});
+    const [values, setValues] = useState<Record<string, string | boolean>>({});
 
     // Features Dropdown Data
     const { data: featuresCommonData } = useGetMastersQuery({
@@ -113,6 +127,31 @@ export default function SubscriptionCreatePage() {
         if (Array.isArray(featuresCommonData)) return featuresCommonData as FeatureOption[];
         return (featuresCommonData as { data: FeatureOption[] })?.data || [];
     }, [featuresCommonData]);
+
+    // Grouping comes from the catalogue's module_key, so a new module appears
+    // here the moment it is seeded — no list to keep in step.
+    const { moduleGroups, accountWide } = useMemo(() => {
+        const groups = new Map<string, ModuleGroup>();
+        const account: FeatureOption[] = [];
+
+        featuresData.forEach((f) => {
+            if (!f.module_key) {
+                account.push(f);
+                return;
+            }
+            if (!groups.has(f.module_key)) {
+                groups.set(f.module_key, { key: f.module_key, limits: [] });
+            }
+            const g = groups.get(f.module_key)!;
+            if (f.code.startsWith(MODULE_PREFIX)) g.gate = f;
+            else g.limits.push(f);
+        });
+
+        return {
+            moduleGroups: [...groups.values()].sort((a, b) => a.key.localeCompare(b.key)),
+            accountWide: account,
+        };
+    }, [featuresData]);
 
     // Fetch existing subscription data if edit/view
     const { data: existingSubscriptionData, isLoading: isLoadingSubscription } = useGetMasterByIdQuery({
@@ -136,95 +175,78 @@ export default function SubscriptionCreatePage() {
                 description: subscriptionData.description || '',
                 amount: Number(subscriptionData.amount) || 0,
                 yearly_discount: subscriptionData.yearly_discount || 0,
-                razorpay_monthly_plan_id: (subscriptionData as any).razorpay_monthly_plan_id || '',
-                razorpay_yearly_plan_id: (subscriptionData as any).razorpay_yearly_plan_id || '',
+                razorpay_monthly_plan_id: subscriptionData.razorpay_monthly_plan_id || '',
+                razorpay_yearly_plan_id: subscriptionData.razorpay_yearly_plan_id || '',
             });
 
-            // Map existing features to dynamicFields
             if (subscriptionData.features && featuresData.length > 0) {
-                const mappedFields: DynamicField[] = [];
+                const on: Record<string, boolean> = {};
+                const vals: Record<string, string | boolean> = {};
+
                 Object.entries(subscriptionData.features).forEach(([code, value]) => {
-                    const featureDef = featuresData.find(f => f.code === code);
-                    if (featureDef) {
-                        mappedFields.push({
-                            id: Date.now().toString() + Math.random(),
-                            code: featureDef.code,
-                            name: featureDef.name,
-                            type: featureDef.type,
-                            value: value as string | number | boolean
-                        });
+                    const def = featuresData.find((f) => f.code === code);
+                    if (!def) return;
+                    if (def.module_key && code.startsWith(MODULE_PREFIX)) {
+                        on[def.module_key] = value === true;
+                        return;
+                    }
+                    vals[code] = def.type === 'boolean' ? !!value : String(value);
+                });
+
+                // A limit set without its gate means a plan authored before module
+                // gates existed. Treat the module as granted rather than silently
+                // switching it off on the next save.
+                featuresData.forEach((f) => {
+                    if (f.module_key && vals[f.code] !== undefined && on[f.module_key] === undefined) {
+                        on[f.module_key] = true;
                     }
                 });
-                setDynamicFields(mappedFields);
+
+                setModuleOn(on);
+                setValues(vals);
             }
         }
     }, [existingSubscriptionData, isEdit, isView, featuresData, reset]);
 
 
-    const handleAddFeature = (featureCode: string) => {
-        if (!featureCode) return;
-        const featureDef = featuresData.find(f => f.code === featureCode);
-        if (featureDef) {
-            // Check if already added
-            if (dynamicFields.some(f => f.code === featureCode)) {
-                // Optionally show toast: already exists
-                return;
-            }
+    const setValue = (code: string, value: string | boolean) =>
+        setValues((prev) => ({ ...prev, [code]: value }));
 
-            let initialValue: string | number | boolean = '';
-            if (featureDef.type === 'boolean') initialValue = true;
-            if (featureDef.type === 'number') initialValue = 0;
+    const toggleUnlimited = (code: string, on: boolean) =>
+        setValue(code, on ? String(UNLIMITED) : '');
 
-            setDynamicFields([...dynamicFields, {
-                id: Date.now().toString() + Math.random(),
-                code: featureDef.code,
-                name: featureDef.name,
-                type: featureDef.type,
-                value: initialValue
-            }]);
-        }
-    };
+    const isUnlimited = (code: string) => String(values[code] ?? '') === String(UNLIMITED);
 
-    const handleRemoveField = (id: string) => {
-        setDynamicFields(dynamicFields.filter(field => field.id !== id));
-    };
-
-    const handleFieldChange = (id: string, value: string | number | boolean) => {
-        setDynamicFields(dynamicFields.map(field =>
-            field.id === id ? { ...field, value } : field
-        ));
-    };
-
-    // Drag and drop handlers
-    const handleDragStart = (index: number) => {
-        setDraggedIndex(index);
-    };
-
-    const handleDragOver = (e: React.DragEvent, index: number) => {
-        e.preventDefault();
-        if (draggedIndex === null || draggedIndex === index) return;
-
-        const newFields = [...dynamicFields];
-        const draggedItem = newFields[draggedIndex];
-        newFields.splice(draggedIndex, 1);
-        newFields.splice(index, 0, draggedItem);
-
-        setDynamicFields(newFields);
-        setDraggedIndex(index);
-    };
-
-    const handleDragEnd = () => {
-        setDraggedIndex(null);
-    };
+    const limitsSetIn = (g: ModuleGroup) =>
+        g.limits.filter((f) => {
+            const v = values[f.code];
+            return f.type === 'boolean' ? v === true : v !== undefined && v !== '';
+        }).length;
 
     const onSubmit = async (data: SubscriptionFormValues) => {
-        // Construct features object
         const featuresMap: Record<string, string | number | boolean> = {};
-        dynamicFields.forEach(field => {
-            let val = field.value;
-            if (field.type === 'number') val = Number(val);
-            featuresMap[field.code] = val;
+
+        const addValue = (f: FeatureOption) => {
+            const raw = values[f.code];
+            if (f.type === 'boolean') {
+                if (raw !== undefined) featuresMap[f.code] = !!raw;
+                return;
+            }
+            // Blank means no ceiling stated; writing 0 here would block everything.
+            if (raw === undefined || String(raw).trim() === '') return;
+            featuresMap[f.code] =
+                f.type === 'number' ? Number(raw) : String(raw);
+        };
+
+        moduleGroups.forEach((g) => {
+            const on = moduleOn[g.key] ?? false;
+            // The gate is written either way: an explicit false is what locks a
+            // module, and omitting it would leave the module open by default.
+            if (g.gate) featuresMap[g.gate.code] = on;
+            if (on) g.limits.forEach(addValue);
         });
+
+        accountWide.forEach(addValue);
 
         const payload = {
             name: data.name,
@@ -252,8 +274,6 @@ export default function SubscriptionCreatePage() {
     if ((isEdit || isView) && isLoadingSubscription) {
         return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
     }
-
-    const availableFeatures = featuresData.filter(f => !dynamicFields.some(df => df.code === f.code));
 
     return (
         <div className="space-y-6 pt-4">
@@ -386,102 +406,166 @@ export default function SubscriptionCreatePage() {
                         </div>
                     </div>
 
-                    {/* Dynamic Features */}
+                    {/* Modules and allowances */}
                     <div className="space-y-4 pt-4 border-t">
-                        <div className="flex items-center justify-between">
-                            <Label className="text-lg">Plan Features</Label>
+                        <div>
+                            <Label className="text-lg">Modules and allowances</Label>
+                            <p className="text-sm text-muted-foreground mt-1">
+                                Switch a module off and it is locked for every tenant on this plan.
+                                Leave a limit blank for no ceiling, or tick Unlimited to say so
+                                explicitly.
+                            </p>
                         </div>
 
-                        {!isView && (
-                            <div className="flex gap-2 items-end max-w-md">
-                                <div className="flex-1 space-y-2">
-                                    <Label>Add Feature</Label>
-                                    <Select onValueChange={handleAddFeature}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select a feature to add" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {availableFeatures.map(feature => (
-                                                <SelectItem key={feature.id} value={feature.code}>
-                                                    {feature.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="space-y-4 mt-4">
-                            {dynamicFields.length === 0 && (
-                                <p className="text-sm text-muted-foreground italic">No features added yet.</p>
+                        <div className="space-y-3">
+                            {moduleGroups.length === 0 && (
+                                <p className="text-sm text-muted-foreground italic">
+                                    No modules in the feature catalogue yet.
+                                </p>
                             )}
-                            {dynamicFields.map((field, index) => (
-                                <div
-                                    key={field.id}
-                                    draggable={!isView}
-                                    onDragStart={() => handleDragStart(index)}
-                                    onDragOver={(e) => handleDragOver(e, index)}
-                                    onDragEnd={handleDragEnd}
-                                    className={cn(
-                                        "flex items-center gap-4 p-4 bg-muted/30 rounded-lg border border-border transition-all",
-                                        !isView && "cursor-move hover:bg-muted",
-                                        draggedIndex === index && "opacity-50"
-                                    )}
-                                >
-                                    {!isView && (
-                                        <GripVertical size={20} className="text-muted-foreground flex-shrink-0 cursor-grab active:cursor-grabbing" />
-                                    )}
 
-                                    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-                                        <div>
-                                            <Label className="text-muted-foreground">{field.name}</Label>
-                                            <p className="text-xs text-muted-foreground font-mono">{field.code}</p>
+                            {moduleGroups.map((g) => {
+                                const on = moduleOn[g.key] ?? false;
+                                return (
+                                    <div
+                                        key={g.key}
+                                        className={cn(
+                                            'rounded-lg border transition-colors',
+                                            on ? 'border-primary/40 bg-primary/5' : 'border-border bg-muted/20',
+                                        )}
+                                    >
+                                        <div className="flex items-center gap-3 p-4">
+                                            <Switch
+                                                checked={on}
+                                                onCheckedChange={(checked) =>
+                                                    setModuleOn((prev) => ({ ...prev, [g.key]: checked }))
+                                                }
+                                                disabled={isView}
+                                                aria-label={`${titleCase(g.key)} module`}
+                                            />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium">
+                                                    {g.gate?.name?.replace(/ module$/i, '') || titleCase(g.key)}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground font-mono">
+                                                    {g.gate?.code ?? `${MODULE_PREFIX}${g.key}`}
+                                                </p>
+                                            </div>
+                                            {on ? (
+                                                <Badge variant="secondary" className="font-mono text-[10px]">
+                                                    {limitsSetIn(g)}/{g.limits.length} limits set
+                                                </Badge>
+                                            ) : (
+                                                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                    <Lock size={12} /> locked
+                                                </span>
+                                            )}
                                         </div>
 
-                                        <div>
-                                            {field.type === 'boolean' ? (
+                                        {on && g.limits.length > 0 && (
+                                            <div className="border-t border-border/60 px-4 py-3 space-y-3">
+                                                {g.limits.map((f) => (
+                                                    <div
+                                                        key={f.code}
+                                                        className="grid grid-cols-1 md:grid-cols-2 gap-3 items-center"
+                                                    >
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm">{f.name}</p>
+                                                            <p className="text-xs text-muted-foreground font-mono truncate">
+                                                                {f.code}
+                                                                {f.count_model ? ` · counts ${f.count_model}` : ''}
+                                                            </p>
+                                                        </div>
+
+                                                        {f.type === 'boolean' ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <Switch
+                                                                    checked={values[f.code] === true}
+                                                                    onCheckedChange={(c) => setValue(f.code, c)}
+                                                                    disabled={isView}
+                                                                />
+                                                                <span className="text-sm text-muted-foreground">
+                                                                    {values[f.code] === true ? 'Included' : 'Not included'}
+                                                                </span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center gap-3">
+                                                                <Input
+                                                                    type={f.type === 'number' ? 'number' : 'text'}
+                                                                    value={isUnlimited(f.code) ? '' : String(values[f.code] ?? '')}
+                                                                    onChange={(e) => setValue(f.code, e.target.value)}
+                                                                    placeholder={isUnlimited(f.code) ? 'Unlimited' : 'No limit'}
+                                                                    disabled={isView || isUnlimited(f.code)}
+                                                                    className="flex-1"
+                                                                />
+                                                                {f.type === 'number' && (
+                                                                    <label className="flex items-center gap-2 text-xs text-muted-foreground whitespace-nowrap cursor-pointer">
+                                                                        <Checkbox
+                                                                            checked={isUnlimited(f.code)}
+                                                                            onCheckedChange={(c) =>
+                                                                                toggleUnlimited(f.code, c === true)
+                                                                            }
+                                                                            disabled={isView}
+                                                                        />
+                                                                        Unlimited
+                                                                    </label>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {accountWide.length > 0 && (
+                            <div className="pt-2 space-y-3">
+                                <div>
+                                    <Label>Account-wide</Label>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Applies to the whole tenant. These never lock a module.
+                                    </p>
+                                </div>
+                                <div className="rounded-lg border border-border bg-muted/20 px-4 py-3 space-y-3">
+                                    {accountWide.map((f) => (
+                                        <div
+                                            key={f.code}
+                                            className="grid grid-cols-1 md:grid-cols-2 gap-3 items-center"
+                                        >
+                                            <div className="min-w-0">
+                                                <p className="text-sm">{f.name}</p>
+                                                <p className="text-xs text-muted-foreground font-mono truncate">
+                                                    {f.code}
+                                                </p>
+                                            </div>
+                                            {f.type === 'boolean' ? (
                                                 <div className="flex items-center gap-2">
                                                     <Switch
-                                                        checked={field.value as boolean}
-                                                        onCheckedChange={(checked) => handleFieldChange(field.id, checked)}
+                                                        checked={values[f.code] === true}
+                                                        onCheckedChange={(c) => setValue(f.code, c)}
                                                         disabled={isView}
                                                     />
-                                                    <span className="text-sm">{field.value ? 'Enabled' : 'Disabled'}</span>
+                                                    <span className="text-sm text-muted-foreground">
+                                                        {values[f.code] === true ? 'Included' : 'Not included'}
+                                                    </span>
                                                 </div>
-                                            ) : field.type === 'number' ? (
-                                                <Input
-                                                    type="number"
-                                                    value={field.value as number}
-                                                    onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                                                    placeholder="Enter number"
-                                                    disabled={isView}
-                                                />
                                             ) : (
                                                 <Input
-                                                    value={field.value as string}
-                                                    onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                                                    placeholder="Enter value"
+                                                    type={f.type === 'number' ? 'number' : 'text'}
+                                                    value={String(values[f.code] ?? '')}
+                                                    onChange={(e) => setValue(f.code, e.target.value)}
+                                                    placeholder="Not set"
                                                     disabled={isView}
                                                 />
                                             )}
                                         </div>
-                                    </div>
-
-                                    {!isView && (
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => handleRemoveField(field.id)}
-                                            className="text-destructive hover:text-destructive"
-                                        >
-                                            <X size={18} />
-                                        </Button>
-                                    )}
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
