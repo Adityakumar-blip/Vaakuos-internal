@@ -4,18 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { ArrowLeft, Loader2, Edit, Lock } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ModuleStrip } from '@/components/licensing/ModuleStrip';
+import { MODULE_PREFIX, resolveSlots, useModuleSlots } from '@/components/licensing/modules';
+import { formatCurrency } from '@/utils/format';
 import {
     useGetMastersQuery,
     useGetMasterByIdQuery,
@@ -38,8 +33,6 @@ interface FeatureOption {
     count_model?: string | null;
 }
 
-/** Feature code that licenses a whole module. */
-const MODULE_PREFIX = 'module.';
 /** Sentinel matching the backend's UNLIMITED. */
 const UNLIMITED = -1;
 
@@ -51,7 +44,6 @@ interface ModuleGroup {
 
 const titleCase = (key: string) =>
     key.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-
 
 interface Subscription {
     name: string;
@@ -77,6 +69,50 @@ const subscriptionSchema = z.object({
 
 type SubscriptionFormValues = z.infer<typeof subscriptionSchema>;
 
+function Section({
+    title,
+    help,
+    children,
+    className,
+}: {
+    title: string;
+    help?: string;
+    children: React.ReactNode;
+    className?: string;
+}) {
+    return (
+        <section className={cn('bg-card border border-border rounded-lg', className)}>
+            <div className="px-5 py-4 border-b border-border">
+                <h2 className="text-sm font-medium text-foreground">{title}</h2>
+                {help && <p className="text-xs text-muted-foreground mt-1 max-w-[60ch]">{help}</p>}
+            </div>
+            <div className="p-5">{children}</div>
+        </section>
+    );
+}
+
+function Field({
+    label,
+    hint,
+    htmlFor,
+    children,
+}: {
+    label: string;
+    hint?: string;
+    htmlFor?: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="space-y-1.5">
+            <Label htmlFor={htmlFor} className="text-xs">
+                {label}
+            </Label>
+            {children}
+            {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+        </div>
+    );
+}
+
 export default function SubscriptionCreatePage() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -84,6 +120,7 @@ export default function SubscriptionCreatePage() {
     const id = searchParams.get('id');
     const isView = action === 'view';
     const isEdit = action === 'edit';
+    const moduleSlots = useModuleSlots();
 
     // React Hook Form
     const {
@@ -107,7 +144,10 @@ export default function SubscriptionCreatePage() {
 
     const watchedAmount = watch('amount');
     const watchedDiscount = watch('yearly_discount');
-    const yearlyPrice = Math.round(Number(watchedAmount || 0) * 12 * (1 - Number(watchedDiscount || 0) / 100));
+    const watchedName = watch('name');
+    const watchedSubtitle = watch('subtitle');
+    const monthlyPrice = Number(watchedAmount || 0);
+    const yearlyPrice = Math.round(monthlyPrice * 12 * (1 - Number(watchedDiscount || 0) / 100));
 
     /**
      * The licence: which modules this plan grants, and the allowance on each.
@@ -223,6 +263,23 @@ export default function SubscriptionCreatePage() {
             return f.type === 'boolean' ? v === true : v !== undefined && v !== '';
         }).length;
 
+    // The rail reads the licence the same way the tenant pages do, so a plan
+    // being authored and a plan already issued are compared with one glance.
+    const previewSlots = useMemo(
+        () =>
+            resolveSlots(
+                moduleSlots,
+                Object.fromEntries(
+                    moduleGroups.map((g) => [
+                        g.gate?.code ?? `${MODULE_PREFIX}${g.key}`,
+                        moduleOn[g.key] ?? false,
+                    ]),
+                ),
+            ),
+        [moduleSlots, moduleGroups, moduleOn],
+    );
+    const grantedSlots = previewSlots.filter((s) => s.granted);
+
     const onSubmit = async (data: SubscriptionFormValues) => {
         const featuresMap: Record<string, string | number | boolean> = {};
 
@@ -275,319 +332,327 @@ export default function SubscriptionCreatePage() {
         return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
     }
 
+    const renderLimit = (f: FeatureOption) => (
+        <div key={f.code} className="space-y-1.5">
+            <div className="flex items-baseline justify-between gap-3">
+                <label htmlFor={f.code} className="text-xs text-foreground truncate">
+                    {f.name}
+                </label>
+                {f.type === 'number' && (
+                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap cursor-pointer">
+                        <Checkbox
+                            checked={isUnlimited(f.code)}
+                            onCheckedChange={(c) => toggleUnlimited(f.code, c === true)}
+                            disabled={isView}
+                            className="h-3.5 w-3.5"
+                        />
+                        Unlimited
+                    </label>
+                )}
+            </div>
+
+            {f.type === 'boolean' ? (
+                <div className="flex items-center gap-2 h-9">
+                    <Switch
+                        id={f.code}
+                        checked={values[f.code] === true}
+                        onCheckedChange={(c) => setValue(f.code, c)}
+                        disabled={isView}
+                    />
+                    <span className="text-xs text-muted-foreground">
+                        {values[f.code] === true ? 'Included' : 'Not included'}
+                    </span>
+                </div>
+            ) : (
+                <Input
+                    id={f.code}
+                    type={f.type === 'number' ? 'number' : 'text'}
+                    value={isUnlimited(f.code) ? '' : String(values[f.code] ?? '')}
+                    onChange={(e) => setValue(f.code, e.target.value)}
+                    placeholder={isUnlimited(f.code) ? 'Unlimited' : 'No ceiling'}
+                    disabled={isView || isUnlimited(f.code)}
+                    className="h-9 tabular-nums"
+                />
+            )}
+
+            <p className="text-[11px] text-muted-foreground font-mono truncate">
+                {f.code}
+                {f.count_model ? ` · counts ${f.count_model}` : ''}
+            </p>
+        </div>
+    );
+
     return (
-        <div className="space-y-6 pt-4">
+        <div className="pt-4 pb-12">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+            <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
                     <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => navigate('/subscription')}
+                        aria-label="Back to plans"
                     >
                         <ArrowLeft size={20} />
                     </Button>
                     <div>
                         <h1 className="text-2xl font-semibold text-foreground">
-                            {isView ? 'View' : isEdit ? 'Edit' : 'Create'} Plan
+                            {isView ? watchedName || 'Plan' : isEdit ? 'Edit plan' : 'New plan'}
                         </h1>
+                        <p className="text-sm text-muted-foreground mt-1 max-w-[60ch]">
+                            A plan is a licence you can sell. What you switch on here is what every
+                            tenant on it gets.
+                        </p>
                     </div>
                 </div>
                 {isView && (
                     <Button onClick={() => navigate(`/subscription/create?id=${id}&action=edit`)}>
                         <Edit size={16} className="mr-2" />
-                        Edit Subscription
+                        Edit plan
                     </Button>
                 )}
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleFormSubmit(onSubmit)} className="space-y-6">
-                <div className="bg-card border border-border rounded-lg p-6 space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Name */}
-                        <div className="space-y-2">
-                            <Label htmlFor="name">Plan Name *</Label>
-                            <Input
-                                id="name"
-                                {...register('name')}
-                                placeholder="e.g. Pro, Business, Enterprise"
-                                disabled={isView}
-                            />
-                            {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+            <form
+                onSubmit={handleFormSubmit(onSubmit)}
+                className="mt-6 grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start max-w-[64rem]"
+            >
+                <div className="space-y-5">
+                    <Section title="How the plan is sold" help="Shown on the pricing page and on the tenant's billing screen.">
+                        <div className="space-y-5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                <Field label="Plan name" htmlFor="name">
+                                    <Input
+                                        id="name"
+                                        {...register('name')}
+                                        placeholder="Pro"
+                                        disabled={isView}
+                                        error={errors.name?.message}
+                                    />
+                                </Field>
+                                <Field label="Subtitle" htmlFor="subtitle">
+                                    <Input
+                                        id="subtitle"
+                                        {...register('subtitle')}
+                                        placeholder="Best for growing teams"
+                                        disabled={isView}
+                                        error={errors.subtitle?.message}
+                                    />
+                                </Field>
+                            </div>
+
+                            <Field
+                                label="Description"
+                                htmlFor="description"
+                                hint="A paragraph a buyer reads before choosing this plan."
+                            >
+                                <Textarea
+                                    id="description"
+                                    {...register('description')}
+                                    placeholder="What a team on this plan can do."
+                                    disabled={isView}
+                                    rows={3}
+                                />
+                                {errors.description && (
+                                    <p className="text-xs text-destructive">{errors.description.message}</p>
+                                )}
+                            </Field>
                         </div>
+                    </Section>
 
-                        {/* Subtitle */}
-                        <div className="space-y-2">
-                            <Label htmlFor="subtitle">Subtitle *</Label>
-                            <Input
-                                id="subtitle"
-                                {...register('subtitle')}
-                                placeholder="e.g. Best for growing teams"
-                                disabled={isView}
-                            />
-                            {errors.subtitle && <p className="text-sm text-destructive">{errors.subtitle.message}</p>}
-                        </div>
-                    </div>
-
-                    {/* Description */}
-                    <div className="space-y-2">
-                        <Label htmlFor="description">Description *</Label>
-                        <Textarea
-                            id="description"
-                            {...register('description')}
-                            placeholder="Detailed description of the plan"
-                            disabled={isView}
-                            rows={4}
-                        />
-                        {errors.description && <p className="text-sm text-destructive">{errors.description.message}</p>}
-                    </div>
-
-                    {/* Pricing — single row per tier, monthly + yearly */}
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <Label htmlFor="amount">Monthly Amount (₹) *</Label>
+                    <Section title="Price">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                            <Field label="Monthly amount (₹)" htmlFor="amount" hint="Base monthly price in INR.">
                                 <Input
                                     id="amount"
                                     type="number"
                                     {...register('amount')}
-                                    placeholder="e.g. 2499"
+                                    placeholder="2499"
                                     disabled={isView}
+                                    className="tabular-nums"
+                                    error={errors.amount?.message}
                                 />
-                                <p className="text-xs text-muted-foreground">Base monthly price in INR</p>
-                                {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
-                            </div>
+                            </Field>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="yearly_discount">Yearly Discount (%)</Label>
+                            <Field
+                                label="Yearly discount (%)"
+                                htmlFor="yearly_discount"
+                                hint="Taken off twelve months when a tenant pays annually."
+                            >
                                 <Input
                                     id="yearly_discount"
                                     type="number"
                                     {...register('yearly_discount')}
                                     placeholder="0"
                                     disabled={isView}
+                                    className="tabular-nums"
+                                    error={errors.yearly_discount?.message}
                                 />
-                                <p className="text-xs text-muted-foreground">
-                                    Discount applied to annual billing (0–100).{' '}
-                                    {yearlyPrice > 0 && (
-                                        <span className="text-green-600 font-medium">
-                                            Yearly price: ₹{yearlyPrice.toLocaleString('en-IN')}/yr
-                                        </span>
-                                    )}
-                                </p>
-                                {errors.yearly_discount && <p className="text-sm text-destructive">{errors.yearly_discount.message}</p>}
-                            </div>
+                            </Field>
                         </div>
+                    </Section>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <Label htmlFor="razorpay_monthly_plan_id">Razorpay Monthly Plan ID</Label>
+                    <Section
+                        title="Modules and allowances"
+                        help="Switch a module off and it is locked for every tenant on this plan. Leave a limit blank for no ceiling, or tick Unlimited to say so explicitly."
+                    >
+                        {moduleGroups.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                                No modules in the feature catalogue yet. Seed one and it appears here.
+                            </p>
+                        ) : (
+                            <div className="rounded-md border border-border divide-y divide-border overflow-hidden">
+                                {moduleGroups.map((g) => {
+                                    const on = moduleOn[g.key] ?? false;
+                                    return (
+                                        <div key={g.key} className={cn(!on && 'bg-muted/30')}>
+                                            <div className="flex items-center gap-3 px-4 py-3">
+                                                <Switch
+                                                    checked={on}
+                                                    onCheckedChange={(checked) =>
+                                                        setModuleOn((prev) => ({ ...prev, [g.key]: checked }))
+                                                    }
+                                                    disabled={isView}
+                                                    aria-label={`${titleCase(g.key)} module`}
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    <p
+                                                        className={cn(
+                                                            'text-sm truncate',
+                                                            on ? 'font-medium text-foreground' : 'text-muted-foreground',
+                                                        )}
+                                                    >
+                                                        {g.gate?.name?.replace(/ module$/i, '') || titleCase(g.key)}
+                                                    </p>
+                                                    <p className="text-[11px] text-muted-foreground font-mono truncate">
+                                                        {g.gate?.code ?? `${MODULE_PREFIX}${g.key}`}
+                                                    </p>
+                                                </div>
+                                                {on ? (
+                                                    g.limits.length > 0 && (
+                                                        <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
+                                                            {limitsSetIn(g)}/{g.limits.length} limits set
+                                                        </span>
+                                                    )
+                                                ) : (
+                                                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                        <Lock size={12} /> locked
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {on && g.limits.length > 0 && (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 px-4 sm:pl-[4.5rem] pb-4 pt-3 border-t border-border/50">
+                                                    {g.limits.map(renderLimit)}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {accountWide.length > 0 && (
+                            <div className="mt-6 pt-5 border-t border-border">
+                                <h3 className="text-sm font-medium">Account-wide</h3>
+                                <p className="text-xs text-muted-foreground mt-1 max-w-[60ch]">
+                                    Applies to the whole tenant. These never lock a module.
+                                </p>
+                                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                                    {accountWide.map(renderLimit)}
+                                </div>
+                            </div>
+                        )}
+                    </Section>
+
+                    <Section
+                        title="Razorpay"
+                        help="Plan IDs from the Razorpay dashboard. Leave blank until the plan exists there."
+                    >
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                            <Field label="Monthly plan ID" htmlFor="razorpay_monthly_plan_id">
                                 <Input
                                     id="razorpay_monthly_plan_id"
                                     {...register('razorpay_monthly_plan_id')}
                                     placeholder="plan_XXXXXXXXXX"
                                     disabled={isView}
-                                    className="font-mono text-sm"
+                                    className="font-mono text-xs"
                                 />
-                                <p className="text-xs text-muted-foreground">Razorpay plan ID for monthly billing</p>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="razorpay_yearly_plan_id">Razorpay Yearly Plan ID</Label>
+                            </Field>
+                            <Field label="Yearly plan ID" htmlFor="razorpay_yearly_plan_id">
                                 <Input
                                     id="razorpay_yearly_plan_id"
                                     {...register('razorpay_yearly_plan_id')}
                                     placeholder="plan_XXXXXXXXXX"
                                     disabled={isView}
-                                    className="font-mono text-sm"
+                                    className="font-mono text-xs"
                                 />
-                                <p className="text-xs text-muted-foreground">Razorpay plan ID for annual billing</p>
-                            </div>
+                            </Field>
                         </div>
-                    </div>
-
-                    {/* Modules and allowances */}
-                    <div className="space-y-4 pt-4 border-t">
-                        <div>
-                            <Label className="text-lg">Modules and allowances</Label>
-                            <p className="text-sm text-muted-foreground mt-1">
-                                Switch a module off and it is locked for every tenant on this plan.
-                                Leave a limit blank for no ceiling, or tick Unlimited to say so
-                                explicitly.
-                            </p>
-                        </div>
-
-                        <div className="space-y-3">
-                            {moduleGroups.length === 0 && (
-                                <p className="text-sm text-muted-foreground italic">
-                                    No modules in the feature catalogue yet.
-                                </p>
-                            )}
-
-                            {moduleGroups.map((g) => {
-                                const on = moduleOn[g.key] ?? false;
-                                return (
-                                    <div
-                                        key={g.key}
-                                        className={cn(
-                                            'rounded-lg border transition-colors',
-                                            on ? 'border-primary/40 bg-primary/5' : 'border-border bg-muted/20',
-                                        )}
-                                    >
-                                        <div className="flex items-center gap-3 p-4">
-                                            <Switch
-                                                checked={on}
-                                                onCheckedChange={(checked) =>
-                                                    setModuleOn((prev) => ({ ...prev, [g.key]: checked }))
-                                                }
-                                                disabled={isView}
-                                                aria-label={`${titleCase(g.key)} module`}
-                                            />
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-medium">
-                                                    {g.gate?.name?.replace(/ module$/i, '') || titleCase(g.key)}
-                                                </p>
-                                                <p className="text-xs text-muted-foreground font-mono">
-                                                    {g.gate?.code ?? `${MODULE_PREFIX}${g.key}`}
-                                                </p>
-                                            </div>
-                                            {on ? (
-                                                <Badge variant="secondary" className="font-mono text-[10px]">
-                                                    {limitsSetIn(g)}/{g.limits.length} limits set
-                                                </Badge>
-                                            ) : (
-                                                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                                    <Lock size={12} /> locked
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        {on && g.limits.length > 0 && (
-                                            <div className="border-t border-border/60 px-4 py-3 space-y-3">
-                                                {g.limits.map((f) => (
-                                                    <div
-                                                        key={f.code}
-                                                        className="grid grid-cols-1 md:grid-cols-2 gap-3 items-center"
-                                                    >
-                                                        <div className="min-w-0">
-                                                            <p className="text-sm">{f.name}</p>
-                                                            <p className="text-xs text-muted-foreground font-mono truncate">
-                                                                {f.code}
-                                                                {f.count_model ? ` · counts ${f.count_model}` : ''}
-                                                            </p>
-                                                        </div>
-
-                                                        {f.type === 'boolean' ? (
-                                                            <div className="flex items-center gap-2">
-                                                                <Switch
-                                                                    checked={values[f.code] === true}
-                                                                    onCheckedChange={(c) => setValue(f.code, c)}
-                                                                    disabled={isView}
-                                                                />
-                                                                <span className="text-sm text-muted-foreground">
-                                                                    {values[f.code] === true ? 'Included' : 'Not included'}
-                                                                </span>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex items-center gap-3">
-                                                                <Input
-                                                                    type={f.type === 'number' ? 'number' : 'text'}
-                                                                    value={isUnlimited(f.code) ? '' : String(values[f.code] ?? '')}
-                                                                    onChange={(e) => setValue(f.code, e.target.value)}
-                                                                    placeholder={isUnlimited(f.code) ? 'Unlimited' : 'No limit'}
-                                                                    disabled={isView || isUnlimited(f.code)}
-                                                                    className="flex-1"
-                                                                />
-                                                                {f.type === 'number' && (
-                                                                    <label className="flex items-center gap-2 text-xs text-muted-foreground whitespace-nowrap cursor-pointer">
-                                                                        <Checkbox
-                                                                            checked={isUnlimited(f.code)}
-                                                                            onCheckedChange={(c) =>
-                                                                                toggleUnlimited(f.code, c === true)
-                                                                            }
-                                                                            disabled={isView}
-                                                                        />
-                                                                        Unlimited
-                                                                    </label>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        {accountWide.length > 0 && (
-                            <div className="pt-2 space-y-3">
-                                <div>
-                                    <Label>Account-wide</Label>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        Applies to the whole tenant. These never lock a module.
-                                    </p>
-                                </div>
-                                <div className="rounded-lg border border-border bg-muted/20 px-4 py-3 space-y-3">
-                                    {accountWide.map((f) => (
-                                        <div
-                                            key={f.code}
-                                            className="grid grid-cols-1 md:grid-cols-2 gap-3 items-center"
-                                        >
-                                            <div className="min-w-0">
-                                                <p className="text-sm">{f.name}</p>
-                                                <p className="text-xs text-muted-foreground font-mono truncate">
-                                                    {f.code}
-                                                </p>
-                                            </div>
-                                            {f.type === 'boolean' ? (
-                                                <div className="flex items-center gap-2">
-                                                    <Switch
-                                                        checked={values[f.code] === true}
-                                                        onCheckedChange={(c) => setValue(f.code, c)}
-                                                        disabled={isView}
-                                                    />
-                                                    <span className="text-sm text-muted-foreground">
-                                                        {values[f.code] === true ? 'Included' : 'Not included'}
-                                                    </span>
-                                                </div>
-                                            ) : (
-                                                <Input
-                                                    type={f.type === 'number' ? 'number' : 'text'}
-                                                    value={String(values[f.code] ?? '')}
-                                                    onChange={(e) => setValue(f.code, e.target.value)}
-                                                    placeholder="Not set"
-                                                    disabled={isView}
-                                                />
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                    </Section>
                 </div>
 
-                {/* Actions */}
-                {!isView && (
-                    <div className="flex justify-end gap-3">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => navigate('/subscription')}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={isAdding || isUpdating}>
-                            {isAdding || isUpdating ? (
-                                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
-                            ) : (
-                                isEdit ? 'Update Plan' : 'Create Plan'
-                            )}
-                        </Button>
+                {/* The licence as it stands */}
+                <aside className="bg-card border border-border rounded-lg xl:sticky xl:top-4">
+                    <div className="px-5 py-4 border-b border-border">
+                        <p className="text-sm font-medium truncate">{watchedName || 'Untitled plan'}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                            {watchedSubtitle || 'What this licence grants'}
+                        </p>
                     </div>
-                )}
+
+                    <div className="px-5 py-4 border-b border-border">
+                        <div className="flex items-baseline gap-1.5">
+                            <span className="text-2xl font-semibold tabular-nums">
+                                {formatCurrency(monthlyPrice)}
+                            </span>
+                            <span className="text-xs text-muted-foreground">a month</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1 tabular-nums">
+                            {formatCurrency(yearlyPrice)} a year
+                            {Number(watchedDiscount) > 0 && ` · ${Number(watchedDiscount)}% off annually`}
+                        </p>
+                    </div>
+
+                    <div className="px-5 py-4 space-y-2.5">
+                        <div className="flex items-center justify-between gap-3">
+                            <ModuleStrip slots={previewSlots} />
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                                {grantedSlots.length} of {previewSlots.length} modules
+                            </span>
+                        </div>
+                        <p className="text-xs text-foreground leading-relaxed">
+                            {grantedSlots.length > 0
+                                ? grantedSlots.map((s) => s.label).join(', ')
+                                : 'Nothing granted yet — every module is locked.'}
+                        </p>
+                    </div>
+
+                    {!isView && (
+                        <div className="px-5 py-4 border-t border-border space-y-2">
+                            <Button type="submit" className="w-full" disabled={isAdding || isUpdating}>
+                                {isAdding || isUpdating ? (
+                                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving</>
+                                ) : (
+                                    isEdit ? 'Save plan' : 'Create plan'
+                                )}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                className="w-full"
+                                onClick={() => navigate('/subscription')}
+                            >
+                                Cancel
+                            </Button>
+                            <p className="text-[11px] text-muted-foreground text-center">
+                                {isEdit
+                                    ? 'Changes reach every tenant on this plan.'
+                                    : 'A new plan stays private until you publish it.'}
+                            </p>
+                        </div>
+                    )}
+                </aside>
             </form>
         </div>
     );

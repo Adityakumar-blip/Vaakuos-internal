@@ -1,32 +1,71 @@
-export enum IntegrationType {
-  PAYMENT = 'payment',
-  MESSAGING = 'messaging',
-  ANALYTICS = 'analytics',
-  OTHER = 'other',
+export const INTEGRATION_CATEGORIES = [
+  'ecommerce',
+  'messaging',
+  'social',
+  'productivity',
+  'automation',
+  'developer',
+  'other',
+] as const;
+
+export const INTEGRATION_STATUSES = [
+  'operational',
+  'degraded',
+  'down',
+  'maintenance',
+] as const;
+
+export const CONFIG_FIELD_TYPES = [
+  'text',
+  'password',
+  'url',
+  'number',
+  'boolean',
+] as const;
+
+export type IntegrationCategory = (typeof INTEGRATION_CATEGORIES)[number];
+export type IntegrationStatus = (typeof INTEGRATION_STATUSES)[number];
+export type ConfigFieldType = (typeof CONFIG_FIELD_TYPES)[number];
+
+/** One credential a tenant must supply before this provider can connect. */
+export interface ConfigField {
+  key: string;
+  label: string;
+  type: ConfigFieldType;
+  required?: boolean;
+  help?: string;
 }
 
-export interface Integration {
+export interface IntegrationCatalogEntry {
   id: string;
+  provider: string;
   name: string;
-  code: string;
-  description?: string;
-  type: IntegrationType;
-  is_active: boolean;
+  description?: string | null;
+  category: IntegrationCategory;
+  icon_url?: string | null;
+  docs_url?: string | null;
+  status: IntegrationStatus;
+  status_message?: string | null;
+  is_enabled: boolean;
+  config_fields: ConfigField[];
+  sort_order: number;
   created_at?: string;
   updated_at?: string;
 }
 
-export interface IntegrationFormData {
-  name: string;
-  code: string;
-  description?: string;
-  type: IntegrationType;
-  is_active: boolean;
-}
+export const CATEGORY_LABELS: Record<IntegrationCategory, string> = {
+  ecommerce: 'E-commerce',
+  messaging: 'Messaging',
+  social: 'Social',
+  productivity: 'Productivity',
+  automation: 'Automation',
+  developer: 'Developer',
+  other: 'Other',
+};
 
-export const INTEGRATION_TYPE_OPTIONS = [
-  { value: IntegrationType.PAYMENT, label: 'Payment' },
-  { value: IntegrationType.MESSAGING, label: 'Messaging' },
-  { value: IntegrationType.ANALYTICS, label: 'Analytics' },
-  { value: IntegrationType.OTHER, label: 'Other' },
-] as const;
+export const STATUS_LABELS: Record<IntegrationStatus, string> = {
+  operational: 'Operational',
+  degraded: 'Degraded',
+  down: 'Down',
+  maintenance: 'Maintenance',
+};

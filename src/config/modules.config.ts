@@ -4,6 +4,7 @@ import { Permission } from "@/types/permissions.enum";
 export const INTERNAL_MODULES: ModuleConfig[] = [
   {
     id: "dashboard",
+    group: "Overview",
     name: "Dashboard",
     path: "/dashboard",
     icon: "Squares2X2Icon",
@@ -12,6 +13,7 @@ export const INTERNAL_MODULES: ModuleConfig[] = [
   },
   {
     id: "team",
+    group: "Access Control",
     name: "Team",
     path: "/team",
     icon: "UsersIcon",
@@ -69,6 +71,7 @@ export const INTERNAL_MODULES: ModuleConfig[] = [
   },
   {
     id: "agencies",
+    group: "Customers",
     name: "Agencies",
     path: "/agencies",
     icon: "BriefcaseIcon",
@@ -83,6 +86,7 @@ export const INTERNAL_MODULES: ModuleConfig[] = [
   },
   {
     id: "brands",
+    group: "Customers",
     name: "Brands",
     path: "/brands",
     icon: "BuildingOfficeIcon",
@@ -97,6 +101,7 @@ export const INTERNAL_MODULES: ModuleConfig[] = [
   },
   {
     id: "billing",
+    group: "Revenue",
     name: "Billing",
     path: "/billing",
     icon: "CreditCardIcon",
@@ -112,6 +117,7 @@ export const INTERNAL_MODULES: ModuleConfig[] = [
   },
   {
     id: "subscription",
+    group: "Revenue",
     name: "Subscription",
     path: "/subscription",
     icon: "CalendarIcon",
@@ -124,6 +130,7 @@ export const INTERNAL_MODULES: ModuleConfig[] = [
   },
   {
     id: "coupon",
+    group: "Revenue",
     name: "Coupon",
     path: "/coupon",
     icon: "TicketIcon",
@@ -137,6 +144,7 @@ export const INTERNAL_MODULES: ModuleConfig[] = [
   },
   {
     id: "offer",
+    group: "Revenue",
     name: "Offers",
     path: "/offer",
     icon: "TagIcon",
@@ -150,6 +158,7 @@ export const INTERNAL_MODULES: ModuleConfig[] = [
   },
   {
     id: "faq",
+    group: "Content",
     name: "FAQ",
     path: "/faq",
     icon: "QuestionMarkCircleIcon",
@@ -157,49 +166,38 @@ export const INTERNAL_MODULES: ModuleConfig[] = [
     requiredPermissions: [Permission.MASTER_DATA_MANAGE],
   },
   {
-    id: "master",
-    name: "Master Data",
-    path: "/master",
-    icon: "ServerIcon",
+    id: "plan-features",
+    name: "Plan Features",
+    group: "Revenue",
+    path: "/master/plan-features",
+    icon: "BoltIcon",
+    adminTypes: ["owner"],
+    requiredPermissions: [Permission.FEATURES_MANAGE],
+  },
+  {
+    id: "faq-categories",
+    name: "FAQ Categories",
+    group: "Content",
+    path: "/master/faq-categories",
+    icon: "FolderOpenIcon",
+    adminTypes: ["owner"],
+    requiredPermissions: [Permission.MASTER_DATA_MANAGE],
+  },
+  {
+    id: "integrations",
+    name: "Integrations",
+    group: "Platform",
+    path: "/master/integrations",
+    icon: "ArrowsRightLeftIcon",
     adminTypes: ["owner"],
     requiredPermissions: [
-      Permission.MASTER_DATA_READ,
-      Permission.MASTER_DATA_MANAGE,
       Permission.INTEGRATIONS_READ,
       Permission.INTEGRATIONS_MANAGE,
-    ],
-    children: [
-      {
-        id: "plan-features",
-        name: "Plan Features",
-        path: "/master/plan-features",
-        icon: "BoltIcon",
-        adminTypes: ["owner"],
-        requiredPermissions: [Permission.FEATURES_MANAGE],
-      },
-      {
-        id: "faq-categories",
-        name: "FAQ Categories",
-        path: "/master/faq-categories",
-        icon: "QuestionMarkCircleIcon",
-        adminTypes: ["owner"],
-        requiredPermissions: [Permission.MASTER_DATA_MANAGE],
-      },
-      {
-        id: "integrations",
-        name: "Integrations",
-        path: "/master/integrations",
-        icon: "ArrowsRightLeftIcon",
-        adminTypes: ["owner"],
-        requiredPermissions: [
-          Permission.INTEGRATIONS_READ,
-          Permission.INTEGRATIONS_MANAGE,
-        ],
-      },
     ],
   },
   {
     id: "features",
+    group: "Platform",
     name: "Features",
     path: "/features",
     icon: "BoltIcon",
@@ -208,6 +206,7 @@ export const INTERNAL_MODULES: ModuleConfig[] = [
   },
   {
     id: "monitoring",
+    group: "Operations",
     name: "Monitoring",
     path: "/monitoring",
     icon: "ChartBarIcon",
@@ -216,6 +215,7 @@ export const INTERNAL_MODULES: ModuleConfig[] = [
   },
   {
     id: "audit-logs",
+    group: "Operations",
     name: "Audit Trail",
     path: "/audit-logs",
     icon: "DocumentTextIcon",
@@ -224,6 +224,7 @@ export const INTERNAL_MODULES: ModuleConfig[] = [
   },
   {
     id: "error-logs",
+    group: "Operations",
     name: "Error Logs",
     path: "/error-logs",
     icon: "ExclamationCircleIcon",
@@ -232,6 +233,7 @@ export const INTERNAL_MODULES: ModuleConfig[] = [
   },
   {
     id: "config",
+    group: "Platform",
     name: "Config",
     path: "/config",
     icon: "Cog6ToothIcon",
@@ -243,6 +245,7 @@ export const INTERNAL_MODULES: ModuleConfig[] = [
   },
   {
     id: "emergency",
+    group: "Operations",
     name: "Emergency",
     path: "/emergency",
     icon: "ExclamationTriangleIcon",
@@ -251,6 +254,7 @@ export const INTERNAL_MODULES: ModuleConfig[] = [
   },
   {
     id: "templates",
+    group: "Content",
     name: "Templates",
     path: "/templates",
     icon: "RectangleGroupIcon",
@@ -265,6 +269,7 @@ export const INTERNAL_MODULES: ModuleConfig[] = [
   },
   {
     id: "blog",
+    group: "Content",
     name: "Blog",
     path: "/blog",
     icon: "NewspaperIcon",

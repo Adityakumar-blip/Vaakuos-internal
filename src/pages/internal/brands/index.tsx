@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Building2, KeyRound, Loader2, RotateCcw, Search, Ban } from 'lucide-react';
+import { Building2, KeyRound, Loader2, RotateCcw, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -14,7 +13,10 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { DataTable, type Column } from '@/components/ui/data-table';
+import { RowActions, TableHeader } from '@/components/table';
 import { cn } from '@/lib/utils';
+import { formatDate } from '@/utils/format';
 import {
     useGetBrandsQuery,
     useRevokeLicenceMutation,
@@ -49,6 +51,7 @@ export default function BrandsManagement() {
     const [revoke, { isLoading: isRevoking }] = useRevokeLicenceMutation();
 
     const [query, setQuery] = useState('');
+    const [pageSize, setPageSize] = useState(10);
     const [revoking, setRevoking] = useState<BrandOverview | null>(null);
     const [reason, setReason] = useState('');
 
@@ -77,13 +80,135 @@ export default function BrandsManagement() {
         }
     };
 
-    if (isLoading) {
-        return (
-            <div className="flex h-[400px] items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-        );
-    }
+    const columns: Column<BrandOverview>[] = [
+        {
+            accessorKey: 'name',
+            header: 'Brand',
+            sortValue: (b) => b.name,
+            cell: ({ row }) => (
+                <div className="min-w-0">
+                    <p className="text-sm font-medium truncate flex items-center gap-2">
+                        <Building2 size={14} className="text-muted-foreground shrink-0" />
+                        {row.original.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate mt-0.5 pl-6">
+                        {row.original.agencyName}
+                    </p>
+                </div>
+            ),
+        },
+        {
+            id: 'licence',
+            header: 'Licence',
+            sortValue: (b) => b.planName ?? '',
+            cell: ({ row }) => {
+                const brand = row.original;
+                const unlicensed = brand.status === 'inactive';
+                const revoked = REVOKED.includes(brand.status);
+                const trial = brand.status === 'trialing' ? daysLeft(brand.trialEndsAt) : null;
+                const overrideCount = Object.keys(brand.customLimits ?? {}).length;
+
+                return (
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                            className={cn(
+                                'text-sm truncate',
+                                revoked || unlicensed ? 'text-muted-foreground' : 'text-foreground',
+                            )}
+                        >
+                            {unlicensed ? 'No licence' : brand.planName}
+                        </span>
+                        <span
+                            className={cn(
+                                'font-mono text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap',
+                                revoked && 'text-destructive bg-destructive/10',
+                                brand.status === 'trialing' &&
+                                    'text-[hsl(var(--brand-secondary))] bg-[hsl(var(--brand-secondary))]/10',
+                                brand.status === 'active' && 'text-primary bg-primary/10',
+                                unlicensed && 'text-muted-foreground bg-muted',
+                            )}
+                        >
+                            {licenceLabel(brand)}
+                            {trial !== null && ` · ${trial}d`}
+                        </span>
+                        {overrideCount > 0 && (
+                            <span className="font-mono text-[10px] text-[hsl(var(--brand-secondary))] whitespace-nowrap">
+                                {overrideCount} override{overrideCount > 1 ? 's' : ''}
+                            </span>
+                        )}
+                    </div>
+                );
+            },
+        },
+        {
+            id: 'modules',
+            header: 'Modules',
+            cell: ({ row }) => {
+                const brand = row.original;
+                if (brand.status === 'inactive') {
+                    return <span className="text-xs text-muted-foreground">—</span>;
+                }
+                return (
+                    <ModuleStrip
+                        variant="full"
+                        slots={resolveSlots(moduleSlots, brand.planFeatures, brand.customLimits)}
+                        className={cn(REVOKED.includes(brand.status) && 'opacity-40')}
+                    />
+                );
+            },
+        },
+        {
+            id: 'renews',
+            header: 'Renews',
+            sortValue: (b) => b.currentPeriodEnd ?? b.trialEndsAt ?? '',
+            cell: ({ row }) => {
+                const brand = row.original;
+                const trialEnd = brand.status === 'trialing' ? brand.trialEndsAt : null;
+                return (
+                    <span className="text-sm text-muted-foreground tabular-nums whitespace-nowrap">
+                        {formatDate(trialEnd ?? brand.currentPeriodEnd)}
+                        {trialEnd && <span className="text-xs"> (trial)</span>}
+                    </span>
+                );
+            },
+        },
+        {
+            id: 'actions',
+            header: () => <div className="text-right">Actions</div>,
+            cell: ({ row }) => {
+                const brand = row.original;
+                const revoked = REVOKED.includes(brand.status);
+                const unlicensed = brand.status === 'inactive';
+                const licenceAction = revoked
+                    ? { label: 'Restore licence', icon: <RotateCcw className="w-4 h-4 mr-2" /> }
+                    : unlicensed
+                        ? { label: 'Give a licence', icon: <KeyRound className="w-4 h-4 mr-2" /> }
+                        : { label: 'Change licence', icon: <KeyRound className="w-4 h-4 mr-2" /> };
+
+                return (
+                    <RowActions
+                        extraActions={[
+                            {
+                                ...licenceAction,
+                                onClick: () =>
+                                    navigate(`/subscription/issue-licence?tenant=${brand.id}`),
+                            },
+                            ...(revoked || unlicensed
+                                ? []
+                                : [
+                                      {
+                                          label: 'Revoke licence',
+                                          icon: <Ban className="w-4 h-4 mr-2" />,
+                                          className: 'text-destructive focus:text-destructive',
+                                          onClick: () => setRevoking(brand),
+                                      },
+                                  ]),
+                        ]}
+                    />
+                );
+            },
+        },
+    ];
 
     return (
         <div className="space-y-6 pt-4 pb-12">
@@ -94,128 +219,39 @@ export default function BrandsManagement() {
                         What each brand is licensed for, and how to change it.
                     </p>
                 </div>
-                <Button onClick={() => navigate('/subscription/issue-licence')}>
-                    <KeyRound size={16} className="mr-2" />
-                    Issue a licence
-                </Button>
             </div>
 
-            <div className="relative max-w-sm">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Find a brand, agency or plan"
-                    className="pl-9"
-                />
-            </div>
+            <TableHeader
+                entriesPerPage={pageSize}
+                onEntriesChange={setPageSize}
+                searchValue={query}
+                onSearchChange={setQuery}
+                searchPlaceholder="Find a brand, agency or plan"
+                actionButton={{
+                    label: 'Issue a licence',
+                    onClick: () => navigate('/subscription/issue-licence'),
+                    icon: <KeyRound size={16} />,
+                }}
+            />
 
-            {filtered.length === 0 ? (
-                <div className="border border-dashed border-border rounded-lg py-16 text-center">
-                    <p className="text-sm text-muted-foreground">
-                        {brands.length === 0
-                            ? 'No brands yet. They appear here once an agency signs one up.'
-                            : 'No brand matches that search.'}
-                    </p>
-                </div>
-            ) : (
-                <div className="border border-border rounded-lg overflow-hidden bg-card divide-y divide-border">
-                    {filtered.map((brand) => {
-                        const revoked = REVOKED.includes(brand.status);
-                        const unlicensed = brand.status === 'inactive';
-                        const slots = resolveSlots(moduleSlots, brand.planFeatures, brand.customLimits);
-                        const trial = brand.status === 'trialing' ? daysLeft(brand.trialEndsAt) : null;
-                        const overrideCount = Object.keys(brand.customLimits ?? {}).length;
-
-                        return (
-                            <div
-                                key={brand.id}
-                                className={cn(
-                                    'grid grid-cols-1 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1.6fr)_auto] gap-4 items-center px-4 py-3.5',
-                                    (revoked || unlicensed) && 'bg-muted/30',
-                                )}
-                            >
-                                <div className="min-w-0">
-                                    <p className="text-sm font-medium truncate flex items-center gap-2">
-                                        <Building2 size={14} className="text-muted-foreground shrink-0" />
-                                        {brand.name}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground truncate mt-0.5">
-                                        {brand.agencyName}
-                                    </p>
-                                </div>
-
-                                <div className="min-w-0 space-y-1.5">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <span
-                                            className={cn(
-                                                'text-sm truncate',
-                                                revoked || unlicensed ? 'text-muted-foreground' : 'text-foreground',
-                                            )}
-                                        >
-                                            {unlicensed ? 'No licence' : brand.planName}
-                                        </span>
-                                        <span
-                                            className={cn(
-                                                'font-mono text-[10px] px-1.5 py-0.5 rounded',
-                                                revoked && 'text-destructive bg-destructive/10',
-                                                brand.status === 'trialing' &&
-                                                    'text-[hsl(var(--brand-secondary))] bg-[hsl(var(--brand-secondary))]/10',
-                                                brand.status === 'active' && 'text-primary bg-primary/10',
-                                                unlicensed && 'text-muted-foreground bg-muted',
-                                            )}
-                                        >
-                                            {licenceLabel(brand)}
-                                            {trial !== null && ` · ${trial}d`}
-                                        </span>
-                                        {overrideCount > 0 && (
-                                            <span className="font-mono text-[10px] text-[hsl(var(--brand-secondary))]">
-                                                {overrideCount} override{overrideCount > 1 ? 's' : ''}
-                                            </span>
-                                        )}
-                                    </div>
-                                    {!unlicensed && (
-                                        <ModuleStrip
-                                            slots={slots}
-                                            className={cn(revoked && 'opacity-40')}
-                                        />
-                                    )}
-                                </div>
-
-                                <div className="flex items-center gap-2 justify-start md:justify-end">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() =>
-                                            navigate(`/subscription/issue-licence?tenant=${brand.id}`)
-                                        }
-                                    >
-                                        {revoked || unlicensed ? (
-                                            <>
-                                                <RotateCcw size={13} className="mr-1.5" />
-                                                {revoked ? 'Restore' : 'Give a licence'}
-                                            </>
-                                        ) : (
-                                            'Change licence'
-                                        )}
-                                    </Button>
-                                    {!revoked && !unlicensed && (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="text-muted-foreground hover:text-destructive"
-                                            onClick={() => setRevoking(brand)}
-                                        >
-                                            <Ban size={13} className="mr-1.5" />
-                                            Revoke
-                                        </Button>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
+            <DataTable
+                columns={columns}
+                data={filtered}
+                isLoading={isLoading}
+                pageSize={pageSize}
+                showPagination
+                rowClassName={(b) =>
+                    cn((REVOKED.includes(b.status) || b.status === 'inactive') && 'bg-muted/30')
+                }
+                emptyMessage={
+                    brands.length === 0 ? 'No brands yet' : 'No brand matches that search'
+                }
+                emptyDescription={
+                    brands.length === 0
+                        ? 'They appear here once an agency signs one up.'
+                        : 'Try a different name, agency or plan.'
+                }
+            />
 
             <Dialog
                 open={!!revoking}
