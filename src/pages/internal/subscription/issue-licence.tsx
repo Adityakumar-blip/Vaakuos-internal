@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, Check, Globe, Loader2, Lock, Plus, Search, X } from 'lucide-react';
+import { ArrowLeft, Check, Globe, Loader2, Lock, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,13 +11,14 @@ import {
     SelectContent,
     SelectItem,
     SelectTrigger,
+    SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { useGetMastersQuery } from '@/store/api/mastersApi';
 import { useGetBrandsQuery, useAssignLicenceMutation } from '@/store/api/brandApi';
 import { ModuleStrip } from '@/components/licensing/ModuleStrip';
 import { modulesUnset, resolveSlots, useModuleSlots } from '@/components/licensing/modules';
-import { formatPaise } from '@/utils/format';
+import { formatCurrency } from '@/utils/format';
 
 const PLANS_URL = '/subscriptions/plans';
 const FEATURES_DROPDOWN_URL = '/plan-features/features-dropdown';
@@ -87,8 +88,6 @@ export default function IssueLicencePage() {
 
     // Arriving from a brand row means the tenant is already decided.
     const [tenantId, setTenantId] = useState(searchParams.get('tenant') ?? '');
-    const [picking, setPicking] = useState(!searchParams.get('tenant'));
-    const [tenantQuery, setTenantQuery] = useState('');
     const [planId, setPlanId] = useState('');
     const [overrides, setOverrides] = useState<Record<string, string | boolean>>({});
     const [note, setNote] = useState('');
@@ -101,12 +100,6 @@ export default function IssueLicencePage() {
     const tenants = (brandsData ?? NO_TENANTS) as unknown as Tenant[];
     const plans = unwrap<Plan>(plansData).filter((p) => p.is_active !== false);
     const features = unwrap<FeatureOption>(featuresData);
-
-    const filteredTenants = useMemo(() => {
-        const q = tenantQuery.trim().toLowerCase();
-        if (!q) return tenants;
-        return tenants.filter((t) => t.name?.toLowerCase().includes(q));
-    }, [tenants, tenantQuery]);
 
     const tenant = tenants.find((t) => t.id === tenantId);
     const plan = plans.find((p) => p.id === planId);
@@ -177,75 +170,34 @@ export default function IssueLicencePage() {
                 </div>
             </div>
 
-            {/* Who — a bar, not a column: once the tenant is chosen it is one line of fact. */}
             <section className="bg-card border border-border rounded-lg">
-                {tenant && !picking ? (
-                    <div className="flex items-center gap-3 px-4 py-3">
-                        <span className="text-xs text-muted-foreground w-14 shrink-0">Tenant</span>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{tenant.name}</p>
-                            <p className="text-xs text-muted-foreground font-mono truncate">
-                                {tenant.planName || 'no plan'} · {tenant.status || 'inactive'}
-                            </p>
-                        </div>
-                        <Button variant="ghost" size="sm" onClick={() => setPicking(true)}>
-                            Change
-                        </Button>
-                    </div>
-                ) : (
-                    <div className="p-4 space-y-3">
-                        <div className="flex items-center gap-3">
-                            <span className="text-xs text-muted-foreground w-14 shrink-0">Tenant</span>
-                            <div className="relative flex-1">
-                                <Search
-                                    size={14}
-                                    className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                                />
-                                <Input
-                                    autoFocus
-                                    value={tenantQuery}
-                                    onChange={(e) => setTenantQuery(e.target.value)}
-                                    placeholder="Find a tenant by name"
-                                    className="pl-9"
-                                />
-                            </div>
-                        </div>
-
-                        {loadingTenants ? (
-                            <div className="flex justify-center py-6">
-                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                            </div>
-                        ) : filteredTenants.length === 0 ? (
-                            <p className="text-sm text-muted-foreground py-6 text-center">
-                                No tenant matches that name.
-                            </p>
-                        ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-56 overflow-y-auto">
-                                {filteredTenants.map((t) => (
-                                    <button
-                                        key={t.id}
-                                        type="button"
-                                        onClick={() => {
-                                            setTenantId(t.id);
-                                            setPicking(false);
-                                        }}
-                                        className={cn(
-                                            'text-left px-3 py-2 rounded-md border transition-colors',
-                                            tenantId === t.id
-                                                ? 'border-primary bg-primary/10'
-                                                : 'border-border hover:bg-muted',
-                                        )}
-                                    >
-                                        <p className="text-sm truncate">{t.name}</p>
-                                        <p className="text-xs text-muted-foreground font-mono truncate">
-                                            {t.planName || 'no plan'} · {t.status || 'inactive'}
-                                        </p>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
+                <div className="flex items-center gap-3 px-4 py-3">
+                    <span className="text-xs text-muted-foreground w-14 shrink-0">Tenant</span>
+                    <Select
+                        value={tenantId || undefined}
+                        onValueChange={setTenantId}
+                        disabled={loadingTenants || tenants.length === 0}
+                    >
+                        <SelectTrigger className="flex-1">
+                            {loadingTenants ? (
+                                <span className="flex items-center gap-2 text-muted-foreground">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Loading tenants…
+                                </span>
+                            ) : (
+                                <SelectValue placeholder="Select a tenant" />
+                            )}
+                        </SelectTrigger>
+                        <SelectContent>
+                            {tenants.map((t) => (
+                                <SelectItem key={t.id} value={t.id}>
+                                    {t.name}
+                                    {t.planName ? ` · ${t.planName}` : ' · no plan'}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
             </section>
 
             <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-4 items-start">
@@ -301,7 +253,7 @@ export default function IssueLicencePage() {
                                     </span>
 
                                     <span className="font-mono text-sm tabular-nums shrink-0">
-                                        {formatPaise(p.amount)}
+                                        {formatCurrency(p.amount)}
                                     </span>
                                 </button>
                             );
@@ -332,7 +284,7 @@ export default function IssueLicencePage() {
                                     <span className="w-11 text-xs text-muted-foreground shrink-0">After</span>
                                     <span className="text-sm truncate flex-1">{plan.name}</span>
                                     <span className="font-mono text-sm tabular-nums">
-                                        {formatPaise(plan.amount)}
+                                        {formatCurrency(plan.amount)}
                                     </span>
                                 </div>
                             </div>

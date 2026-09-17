@@ -11,8 +11,9 @@
  * @returns A formatted currency string.
  */
 /**
- * Plan and add-on amounts are stored in the smallest currency unit (paise for
- * INR) because that is what Razorpay bills in.
+ * Formats a value stored in the smallest currency unit (paise for INR).
+ * Plan and add-on amounts in this admin are stored in rupees — use
+ * formatCurrency for those.
  */
 export const formatPaise = (
   paise: number,

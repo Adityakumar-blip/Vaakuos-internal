@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
     AlertTriangle,
@@ -33,6 +33,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { Pill } from '@/components/ui/pill';
 import { cn } from '@/lib/utils';
 import {
     useGetIntegrationCatalogQuery,
@@ -43,6 +44,7 @@ import {
 import {
     CATEGORY_LABELS,
     CONFIG_FIELD_TYPES,
+    IMPLEMENTATION_LABELS,
     INTEGRATION_CATEGORIES,
     INTEGRATION_STATUSES,
     STATUS_LABELS,
@@ -50,7 +52,10 @@ import {
     type IntegrationCatalogEntry,
     type IntegrationCategory,
     type IntegrationStatus,
+    type ManagedPlugin,
 } from './types';
+import { mergePlugins } from './mergePlugins';
+import { PluginInspector } from './PluginInspector';
 
 const STATUS_STYLES: Record<IntegrationStatus, { dot: string; text: string }> = {
     operational: { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' },
@@ -60,30 +65,69 @@ const STATUS_STYLES: Record<IntegrationStatus, { dot: string; text: string }> = 
 };
 
 const ALL = 'all';
+type Slice = 'all' | 'offered' | 'undeclared' | 'incidents';
 
 export default function IntegrationsPage() {
     const [search, setSearch] = useState('');
     const [category, setCategory] = useState<string>(ALL);
     const [status, setStatus] = useState<string>(ALL);
+    const [slice, setSlice] = useState<Slice>('all');
     const [editing, setEditing] = useState<IntegrationCatalogEntry | null>(null);
+    const [inspecting, setInspecting] = useState<ManagedPlugin | null>(null);
 
-    const { data: integrations = [], isLoading } = useGetIntegrationCatalogQuery();
+    const { data: catalog = [], isLoading } = useGetIntegrationCatalogQuery();
     const [toggleIntegration] = useToggleIntegrationMutation();
+
+    const plugins = useMemo(() => mergePlugins(catalog), [catalog]);
+
+    useEffect(() => {
+        if (!inspecting) return;
+        const next = plugins.find((p) => p.provider === inspecting.provider);
+        if (!next) return;
+        const before = inspecting.catalog;
+        const after = next.catalog;
+        if (before?.id !== after?.id || before?.updated_at !== after?.updated_at || before?.is_enabled !== after?.is_enabled) {
+            setInspecting(next);
+        }
+    }, [plugins, inspecting]);
+
+    const stats = useMemo(() => {
+        const inCatalog = plugins.filter((p) => p.catalog).length;
+        const offered = plugins.filter((p) => p.catalog?.is_enabled).length;
+        const undeclared = plugins.filter((p) => !p.catalog).length;
+        const incidents = plugins.filter(
+            (p) => p.catalog && p.catalog.status !== 'operational',
+        ).length;
+        const connected = plugins.reduce(
+            (sum, p) => sum + (p.catalog?.connected_tenants ?? 0),
+            0,
+        );
+        const hasConnectedMetric = plugins.some(
+            (p) => typeof p.catalog?.connected_tenants === 'number',
+        );
+        return { total: plugins.length, inCatalog, offered, undeclared, incidents, connected, hasConnectedMetric };
+    }, [plugins]);
 
     const visible = useMemo(() => {
         const term = search.trim().toLowerCase();
-        return integrations.filter(
-            (item) =>
-                (category === ALL || item.category === category) &&
-                (status === ALL || item.status === status) &&
-                (!term ||
-                    item.name.toLowerCase().includes(term) ||
-                    item.provider.toLowerCase().includes(term)),
-        );
-    }, [integrations, search, category, status]);
+        return plugins.filter((item) => {
+            if (slice === 'offered' && !item.catalog?.is_enabled) return false;
+            if (slice === 'undeclared' && item.catalog) return false;
+            if (slice === 'incidents' && item.catalog?.status === 'operational') return false;
+            if (slice === 'incidents' && !item.catalog) return false;
+            if (category !== ALL && item.category !== category) return false;
+            if (status !== ALL && item.catalog?.status !== status) return false;
+            if (
+                term &&
+                !item.name.toLowerCase().includes(term) &&
+                !item.provider.toLowerCase().includes(term)
+            ) {
+                return false;
+            }
+            return true;
+        });
+    }, [plugins, search, category, status, slice]);
 
-    // Category is the operator's mental index into a list this long, so the grid
-    // is sectioned rather than one undifferentiated wall of cards.
     const sections = useMemo(
         () =>
             INTEGRATION_CATEGORIES.map((key) => ({
@@ -93,15 +137,18 @@ export default function IntegrationsPage() {
         [visible],
     );
 
-    const incidents = integrations.filter((i) => i.status !== 'operational').length;
-    const offered = integrations.filter((i) => i.is_enabled).length;
-    const isFiltered = search.trim() !== '' || category !== ALL || status !== ALL;
+    const isFiltered =
+        search.trim() !== '' || category !== ALL || status !== ALL || slice !== 'all';
 
-    const handleToggle = async (item: IntegrationCatalogEntry) => {
+    const handleToggle = async (item: ManagedPlugin) => {
+        if (!item.catalog) {
+            setInspecting(item);
+            return;
+        }
         try {
-            await toggleIntegration(item.id).unwrap();
+            await toggleIntegration(item.catalog.id).unwrap();
             toast.success(
-                `${item.name} ${item.is_enabled ? 'withdrawn from' : 'offered to'} all tenants`,
+                `${item.name} ${item.catalog.is_enabled ? 'withdrawn from' : 'offered to'} all tenants`,
             );
         } catch {
             toast.error(`Could not update ${item.name}`);
@@ -112,29 +159,77 @@ export default function IntegrationsPage() {
         setSearch('');
         setCategory(ALL);
         setStatus(ALL);
+        setSlice('all');
     };
 
     return (
         <div className="space-y-6 pt-4">
             <div>
                 <h1 className="text-2xl font-semibold text-foreground">Integrations</h1>
-                <p className="mt-1 text-sm text-muted-foreground">
-                    Every integration VaakuOS ships. Control what tenants are offered, publish
-                    outages, and define the credentials each one asks for.
+                <p className="mt-1 text-sm text-muted-foreground max-w-3xl">
+                    Catalog control for every VaakuOS plugin — including ones the tenant app still
+                    only declares in the frontend. Offer them, publish outages, and inspect usage
+                    and issues from one place.
                 </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-                <StatTile label="In catalog" value={integrations.length} />
-                <StatTile
-                    label="Offered to tenants"
-                    value={`${offered} of ${integrations.length}`}
-                />
-                <StatTile
-                    label="Open incidents"
-                    value={incidents}
-                    tone={incidents > 0 ? 'alert' : undefined}
-                />
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                {(
+                    [
+                        { id: 'all' as const, label: 'Known plugins', value: stats.total, hint: 'Catalog + app-declared' },
+                        { id: 'offered' as const, label: 'Offered', value: `${stats.offered} of ${stats.inCatalog}`, hint: 'Visible to tenants' },
+                        {
+                            id: 'undeclared' as const,
+                            label: 'Not in catalog',
+                            value: stats.undeclared,
+                            hint: 'Frontend-only — add to control',
+                        },
+                        {
+                            id: 'incidents' as const,
+                            label: 'Open incidents',
+                            value: stats.incidents,
+                            hint: 'Degraded, down or maintenance',
+                        },
+                    ] as const
+                ).map((tile) => (
+                    <button
+                        key={tile.id}
+                        type="button"
+                        onClick={() => setSlice(tile.id)}
+                        className={cn(
+                            'text-left rounded-xl border bg-card px-4 py-3.5 transition-colors',
+                            'hover:border-primary/40 hover:bg-muted/30',
+                            slice === tile.id
+                                ? 'border-primary ring-1 ring-primary/30 bg-primary/[0.04]'
+                                : 'border-border',
+                        )}
+                    >
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{tile.label}</p>
+                        <p
+                            className={cn(
+                                'mt-1 text-2xl font-semibold tabular-nums',
+                                tile.id === 'incidents' && stats.incidents > 0 && 'text-red-500',
+                                tile.id === 'undeclared' && stats.undeclared > 0 && 'text-amber-600 dark:text-amber-400',
+                            )}
+                        >
+                            {isLoading ? '—' : tile.value}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-1">{tile.hint}</p>
+                    </button>
+                ))}
+                <div className="rounded-xl border border-border bg-card px-4 py-3.5">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                        Connected tenants
+                    </p>
+                    <p className="mt-1 text-2xl font-semibold tabular-nums">
+                        {isLoading ? '—' : stats.hasConnectedMetric ? stats.connected : '—'}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                        {stats.hasConnectedMetric
+                            ? 'Sum across catalog rows'
+                            : 'API does not send usage yet'}
+                    </p>
+                </div>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -147,7 +242,6 @@ export default function IntegrationsPage() {
                         className="pl-9"
                     />
                 </div>
-                {/* Width has to sit on this wrapper: SelectTrigger renders its own w-full box. */}
                 <div className="shrink-0 sm:w-48">
                     <Select value={category} onValueChange={setCategory}>
                         <SelectTrigger>
@@ -204,10 +298,14 @@ export default function IntegrationsPage() {
                             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                                 {section.items.map((item) => (
                                     <IntegrationCard
-                                        key={item.id}
-                                        integration={item}
+                                        key={item.provider}
+                                        plugin={item}
                                         onToggle={() => handleToggle(item)}
-                                        onManage={() => setEditing(item)}
+                                        onManage={() => {
+                                            if (item.catalog) setEditing(item.catalog);
+                                            else setInspecting(item);
+                                        }}
+                                        onInspect={() => setInspecting(item)}
                                     />
                                 ))}
                             </div>
@@ -216,31 +314,17 @@ export default function IntegrationsPage() {
                 </div>
             )}
 
+            <PluginInspector
+                plugin={inspecting}
+                onClose={() => setInspecting(null)}
+                onManage={() => {
+                    if (inspecting?.catalog) {
+                        setEditing(inspecting.catalog);
+                        setInspecting(null);
+                    }
+                }}
+            />
             <ManageDialog integration={editing} onClose={() => setEditing(null)} />
-        </div>
-    );
-}
-
-function StatTile({
-    label,
-    value,
-    tone,
-}: {
-    label: string;
-    value: string | number;
-    tone?: 'alert';
-}) {
-    return (
-        <div className="rounded-lg border bg-card px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-            <p
-                className={cn(
-                    'mt-1 text-2xl font-semibold tabular-nums',
-                    tone === 'alert' && 'text-red-500',
-                )}
-            >
-                {value}
-            </p>
         </div>
     );
 }
@@ -258,12 +342,12 @@ function EmptyState({
                 <Plug className="h-5 w-5 text-muted-foreground" />
             </div>
             <p className="font-medium">
-                {isFiltered ? 'No integrations match these filters' : 'The catalog is empty'}
+                {isFiltered ? 'No plugins match these filters' : 'No plugins to show'}
             </p>
             <p className="mt-1 max-w-sm text-sm text-muted-foreground">
                 {isFiltered
-                    ? 'Try a different category or status.'
-                    : 'Integrations are seeded from the backend catalog migration. Run it against this environment to populate the list.'}
+                    ? 'Try a different category, status or slice.'
+                    : 'Catalog rows come from the backend; app-declared plugins are listed even before they are seeded.'}
             </p>
             {isFiltered && (
                 <Button variant="outline" size="sm" className="mt-4" onClick={onReset}>
@@ -275,102 +359,142 @@ function EmptyState({
 }
 
 function IntegrationCard({
-    integration,
+    plugin,
     onToggle,
     onManage,
+    onInspect,
 }: {
-    integration: IntegrationCatalogEntry;
+    plugin: ManagedPlugin;
     onToggle: () => void;
     onManage: () => void;
+    onInspect: () => void;
 }) {
-    const statusStyle = STATUS_STYLES[integration.status];
-    const requiredCount = integration.config_fields.filter((f) => f.required).length;
+    const row = plugin.catalog;
+    const statusStyle = row ? STATUS_STYLES[row.status] : STATUS_STYLES.operational;
+    const requiredCount = row?.config_fields.filter((f) => f.required).length ?? 0;
+    const inCatalog = !!row;
 
     return (
         <Card
             className={cn(
-                'flex flex-col transition-colors',
-                !integration.is_enabled && 'border-dashed bg-muted/30',
+                'flex flex-col transition-colors cursor-pointer',
+                (!inCatalog || !row.is_enabled) && 'border-dashed bg-muted/30',
             )}
+            onClick={onInspect}
         >
             <CardHeader className="flex-row items-center gap-3 space-y-0 pb-3">
                 <div
                     className={cn(
                         'flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted text-sm font-semibold uppercase',
-                        !integration.is_enabled && 'opacity-50',
+                        (!inCatalog || !row.is_enabled) && 'opacity-50',
                     )}
                 >
-                    {integration.icon_url ? (
-                        <img
-                            src={integration.icon_url}
-                            alt=""
-                            className="h-full w-full object-contain p-1.5"
-                        />
+                    {row?.icon_url ? (
+                        <img src={row.icon_url} alt="" className="h-full w-full object-contain p-1.5" />
                     ) : (
-                        integration.name.slice(0, 2)
+                        plugin.name.slice(0, 2)
                     )}
                 </div>
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                        <h3 className="truncate font-semibold leading-tight">
-                            {integration.name}
-                        </h3>
-                        {integration.docs_url && (
+                        <h3 className="truncate font-semibold leading-tight">{plugin.name}</h3>
+                        {row?.docs_url && (
                             <a
-                                href={integration.docs_url}
+                                href={row.docs_url}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="shrink-0 text-muted-foreground hover:text-foreground"
-                                aria-label={`${integration.name} documentation`}
+                                aria-label={`${plugin.name} documentation`}
+                                onClick={(e) => e.stopPropagation()}
                             >
                                 <ExternalLink className="h-3.5 w-3.5" />
                             </a>
                         )}
                     </div>
-                    <code className="text-xs text-muted-foreground">{integration.provider}</code>
+                    <code className="text-xs text-muted-foreground">{plugin.provider}</code>
                 </div>
-                <span
-                    className={cn(
-                        'flex shrink-0 items-center gap-1.5 text-xs font-medium',
-                        statusStyle.text,
-                    )}
-                    title={STATUS_LABELS[integration.status]}
-                >
-                    <span className={cn('h-2 w-2 rounded-full', statusStyle.dot)} />
-                    {STATUS_LABELS[integration.status]}
-                </span>
+                {inCatalog ? (
+                    <span
+                        className={cn(
+                            'flex shrink-0 items-center gap-1.5 text-xs font-medium',
+                            statusStyle.text,
+                        )}
+                        title={STATUS_LABELS[row.status]}
+                    >
+                        <span className={cn('h-2 w-2 rounded-full', statusStyle.dot)} />
+                        {STATUS_LABELS[row.status]}
+                    </span>
+                ) : (
+                    <Pill tone="orange" size="xs">
+                        App only
+                    </Pill>
+                )}
             </CardHeader>
 
             <CardContent className="flex-1 space-y-3 pb-3">
                 <p className="line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground">
-                    {integration.description || 'No description yet.'}
+                    {plugin.description || 'No description yet.'}
                 </p>
 
-                {integration.status !== 'operational' && integration.status_message && (
+                <div className="flex flex-wrap gap-1.5">
+                    <Pill
+                        tone={
+                            plugin.implementation === 'wired'
+                                ? 'primary'
+                                : plugin.implementation === 'in_progress'
+                                  ? 'warning'
+                                  : 'neutral'
+                        }
+                        size="xs"
+                    >
+                        {IMPLEMENTATION_LABELS[plugin.implementation]}
+                    </Pill>
+                    {typeof row?.connected_tenants === 'number' && (
+                        <Pill tone="info" size="xs">
+                            {row.connected_tenants} connected
+                        </Pill>
+                    )}
+                    {(row?.error_count_24h ?? 0) > 0 && (
+                        <Pill tone="danger" size="xs">
+                            {row.error_count_24h} errors / 24h
+                        </Pill>
+                    )}
+                </div>
+
+                {row && row.status !== 'operational' && row.status_message && (
                     <p className="flex gap-2 rounded-md bg-muted/60 p-2 text-xs text-muted-foreground">
                         <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                        <span className="line-clamp-2">{integration.status_message}</span>
+                        <span className="line-clamp-2">{row.status_message}</span>
                     </p>
                 )}
 
-                <Badge variant="outline" className="gap-1.5 font-normal text-muted-foreground">
-                    <KeyRound className="h-3 w-3" />
-                    {integration.config_fields.length} field
-                    {integration.config_fields.length === 1 ? '' : 's'}
-                    {requiredCount > 0 && ` · ${requiredCount} required`}
-                </Badge>
+                {inCatalog && (
+                    <Badge variant="outline" className="gap-1.5 font-normal text-muted-foreground">
+                        <KeyRound className="h-3 w-3" />
+                        {row.config_fields.length} field
+                        {row.config_fields.length === 1 ? '' : 's'}
+                        {requiredCount > 0 && ` · ${requiredCount} required`}
+                    </Badge>
+                )}
             </CardContent>
 
-            <CardFooter className="justify-between border-t pt-3">
+            <CardFooter
+                className="justify-between border-t pt-3"
+                onClick={(e) => e.stopPropagation()}
+            >
                 <label className="flex cursor-pointer items-center gap-2 text-sm">
-                    <Switch checked={integration.is_enabled} onCheckedChange={onToggle} />
+                    <Switch
+                        checked={!!row?.is_enabled}
+                        onCheckedChange={onToggle}
+                        disabled={!inCatalog}
+                    />
                     <span className="text-muted-foreground">
-                        {integration.is_enabled ? 'Offered' : 'Withdrawn'}
+                        {!inCatalog ? 'Uncontrolled' : row.is_enabled ? 'Offered' : 'Withdrawn'}
                     </span>
                 </label>
                 <Button variant="outline" size="sm" onClick={onManage}>
                     <Settings2 className="mr-1.5 h-4 w-4" />
-                    Manage
+                    {inCatalog ? 'Manage' : 'Control'}
                 </Button>
             </CardFooter>
         </Card>
