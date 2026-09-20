@@ -18,24 +18,50 @@ import {
     useAddMasterMutation,
     useUpdateMasterMutation,
 } from '@/store/api/mastersApi';
-import { type PlanFeature, FeatureType, FEATURE_TYPE_OPTIONS } from './types';
+import {
+    type PlanFeature,
+    FeatureType,
+    FEATURE_TYPE_OPTIONS,
+    COUNT_MODEL_OPTIONS,
+    MODULE_PREFIX,
+} from './types';
+import { useGetMastersQuery } from '@/store/api/mastersApi';
 import { z } from 'zod';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 const PLAN_FEATURES_URL = '/plan-features';
 
+/**
+ * Empty means "no default", which the backend stores as NULL and treats as
+ * fail-open — deliberately different from a default of 0 or false.
+ */
+function parseDefaultValue(raw: string | undefined, type: FeatureType) {
+    const value = (raw ?? '').trim();
+    if (value === '') return null;
+    if (type === FeatureType.BOOLEAN) return value === 'true';
+    if (type === FeatureType.NUMBER) return Number(value);
+    return value;
+}
+
 // Zod Schema
 const featureSchema = z.object({
     name: z.string().min(1, 'Name is required'),
     code: z.string()
         .min(1, 'Code is required')
-        .regex(/^[a-z0-9_]+$/, 'Code must contain only lowercase letters, numbers, and underscores'),
+        .regex(
+            /^[a-z0-9_]+(\.[a-z0-9_]+)*$/,
+            'Lowercase letters, numbers and underscores, optionally dot-separated (e.g. module.campaigns)',
+        ),
     description: z.string().optional(),
     type: z.nativeEnum(FeatureType, {
         errorMap: () => ({ message: 'Please select a valid feature type' }),
     }),
     is_active: z.boolean().default(true),
+    module_key: z.string().optional(),
+    count_model: z.string().optional(),
+    // Kept as text so "no default" and "0" stay distinguishable; coerced on submit.
+    default_value: z.string().optional(),
 });
 
 type FeatureFormValues = z.infer<typeof featureSchema>;
@@ -66,6 +92,7 @@ export default function PlanFeatureCreatePage() {
         handleSubmit: handleFormSubmit,
         control,
         reset,
+        watch,
         formState: { errors },
     } = useForm<FeatureFormValues>({
         resolver: zodResolver(featureSchema),
@@ -75,8 +102,25 @@ export default function PlanFeatureCreatePage() {
             description: '',
             type: FeatureType.STRING,
             is_active: true,
+            module_key: '',
+            count_model: '',
+            default_value: '',
         },
     });
+
+    const watchedType = watch('type');
+    const watchedCode = watch('code');
+    const isModuleGate = (watchedCode || '').startsWith(MODULE_PREFIX);
+
+    // Existing module keys, so a new feature joins a module instead of coining
+    // a near-miss spelling of one that already exists.
+    const { data: dropdownData } = useGetMastersQuery({ url: '/plan-features/features-dropdown' });
+    const knownModules = React.useMemo(() => {
+        const rows = (Array.isArray(dropdownData)
+            ? dropdownData
+            : (dropdownData as { data?: PlanFeature[] })?.data) ?? [];
+        return [...new Set(rows.map((r) => r.module_key).filter(Boolean))].sort() as string[];
+    }, [dropdownData]);
 
     // Populate form when data is fetched
     useEffect(() => {
@@ -87,6 +131,12 @@ export default function PlanFeatureCreatePage() {
                 description: feature.description || '',
                 type: feature.type,
                 is_active: feature.is_active,
+                module_key: feature.module_key ?? '',
+                count_model: feature.count_model ?? '',
+                default_value:
+                    feature.default_value === null || feature.default_value === undefined
+                        ? ''
+                        : String(feature.default_value),
             });
         }
     }, [feature, reset]);
@@ -99,6 +149,9 @@ export default function PlanFeatureCreatePage() {
                 description: data.description,
                 type: data.type,
                 is_active: data.is_active,
+                module_key: data.module_key?.trim() || null,
+                count_model: data.count_model || null,
+                default_value: parseDefaultValue(data.default_value, data.type),
             };
 
             if (isEdit && id) {
@@ -246,6 +299,103 @@ export default function PlanFeatureCreatePage() {
                                     Data type for this feature value
                                 </p>
                                 {errors.type && <p className="text-sm text-destructive">{errors.type.message}</p>}
+                            </div>
+
+                            {/* Module */}
+                            <div className="space-y-2">
+                                <Label htmlFor="module_key">Module</Label>
+                                <Input
+                                    id="module_key"
+                                    list="known-modules"
+                                    {...register('module_key')}
+                                    placeholder="e.g. campaigns — leave blank for account-wide"
+                                    disabled={isView}
+                                />
+                                <datalist id="known-modules">
+                                    {knownModules.map((m) => (
+                                        <option key={m} value={m} />
+                                    ))}
+                                </datalist>
+                                <p className="text-xs text-muted-foreground">
+                                    Groups this feature under a module. Blank means it applies to the
+                                    whole account and never locks a module.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Enforcement */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Count model */}
+                            <div className="space-y-2">
+                                <Label htmlFor="count_model">Counted from</Label>
+                                <Controller
+                                    control={control}
+                                    name="count_model"
+                                    render={({ field }) => (
+                                        <Select
+                                            value={field.value || 'none'}
+                                            onValueChange={(v) => field.onChange(v === 'none' ? '' : v)}
+                                            disabled={isView || watchedType !== FeatureType.NUMBER}
+                                        >
+                                            <SelectTrigger id="count_model">
+                                                <SelectValue placeholder="Not counted" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none">Not counted</SelectItem>
+                                                {COUNT_MODEL_OPTIONS.map((m) => (
+                                                    <SelectItem key={m} value={m}>
+                                                        {m}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    )}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    {watchedType === FeatureType.NUMBER
+                                        ? 'Usage is a live row count in this table. Leave unset for metered limits, which read from usage records instead.'
+                                        : 'Only applies to number features.'}
+                                </p>
+                            </div>
+
+                            {/* Default value */}
+                            <div className="space-y-2">
+                                <Label htmlFor="default_value">Free-tier default</Label>
+                                {watchedType === FeatureType.BOOLEAN ? (
+                                    <Controller
+                                        control={control}
+                                        name="default_value"
+                                        render={({ field }) => (
+                                            <Select
+                                                value={field.value || 'unset'}
+                                                onValueChange={(v) => field.onChange(v === 'unset' ? '' : v)}
+                                                disabled={isView}
+                                            >
+                                                <SelectTrigger id="default_value">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="unset">No default</SelectItem>
+                                                    <SelectItem value="true">Enabled</SelectItem>
+                                                    <SelectItem value="false">Disabled</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        )}
+                                    />
+                                ) : (
+                                    <Input
+                                        id="default_value"
+                                        type={watchedType === FeatureType.NUMBER ? 'number' : 'text'}
+                                        {...register('default_value')}
+                                        placeholder="No default"
+                                        disabled={isView}
+                                    />
+                                )}
+                                <p className="text-xs text-muted-foreground">
+                                    What a tenant gets with no active plan. Leaving it blank keeps the
+                                    feature out of the defaults entirely, which allows rather than blocks
+                                    {isModuleGate ? ' — the safe setting for a module gate until every live plan lists its modules.' : '.'}
+                                </p>
                             </div>
 
                             {/* Status */}

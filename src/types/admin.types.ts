@@ -45,6 +45,8 @@ export interface ModuleConfig {
   path: string;
   icon: string;
   adminTypes: AdminType[];
+  /** Sidebar section heading; modules sharing one are rendered together. */
+  group?: string;
   requiredPermissions?: string[];
   children?: ModuleConfig[];
 }

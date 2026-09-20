@@ -31,6 +31,34 @@ export const brandApi = api.injectEndpoints({
                     : [{ type: 'Brand', id: 'LIST' }],
         }),
 
+        // Issue a licence to a brand, or replace the one it has
+        assignLicence: builder.mutation<
+            unknown,
+            {
+                tenant_id: string;
+                plan_id: string;
+                custom_limits?: Record<string, number | boolean | string>;
+                note?: string;
+            }
+        >({
+            query: (body) => ({
+                url: '/subscriptions/licences/assign',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: [{ type: 'Brand', id: 'LIST' }],
+        }),
+
+        // Revoke a brand's licence. Keeps the record; the workspace goes read-only.
+        revokeLicence: builder.mutation<unknown, { tenant_id: string; reason?: string }>({
+            query: (body) => ({
+                url: '/subscriptions/licences/revoke',
+                method: 'POST',
+                body,
+            }),
+            invalidatesTags: [{ type: 'Brand', id: 'LIST' }],
+        }),
+
         // Get brand by ID
         getBrandById: builder.query<Brand, string>({
             query: (id) => `/brands/${id}`,
@@ -57,5 +85,7 @@ export const {
     useLazyGetBrandsQuery,
     useGetBrandByIdQuery,
     useLazyGetBrandByIdQuery,
-    useUpdateBrandStatusMutation,
+    useUpdateBrandMutation,
+    useAssignLicenceMutation,
+    useRevokeLicenceMutation,
 } = brandApi;

@@ -10,6 +10,17 @@
  * @param locale - The locale to use for formatting. Defaults to 'en-IN'.
  * @returns A formatted currency string.
  */
+/**
+ * Formats a value stored in the smallest currency unit (paise for INR).
+ * Plan and add-on amounts in this admin are stored in rupees — use
+ * formatCurrency for those.
+ */
+export const formatPaise = (
+  paise: number,
+  currency: string = "INR",
+  locale: string = "en-IN",
+): string => formatCurrency((paise || 0) / 100, currency, locale);
+
 export const formatCurrency = (
   value: number,
   currency: string = "INR",

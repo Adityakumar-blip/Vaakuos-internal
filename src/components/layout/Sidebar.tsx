@@ -75,6 +75,16 @@ export function Sidebar({
 
 
 
+  // Group order follows each group's first appearance in the module config.
+  const moduleGroups = React.useMemo(() => {
+    const grouped = new Map<string, ModuleConfig[]>();
+    adminModules.forEach((module) => {
+      const key = module.group ?? "";
+      grouped.set(key, [...(grouped.get(key) ?? []), module]);
+    });
+    return [...grouped];
+  }, [adminModules]);
+
   const toggleMenu = (id: string) => {
     setOpenMenus((prev) =>
       prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]
@@ -307,7 +317,19 @@ export function Sidebar({
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-2 stealth-scroll pt-2 pb-4">
-          <div className="space-y-1">{adminModules.map(renderAdminModule)}</div>
+          {moduleGroups.map(([group, modules], index) => (
+            <div key={group || index} className={cn("space-y-1", index > 0 && "mt-4")}>
+              {group &&
+                (isActuallyExpanded ? (
+                  <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
+                    {group}
+                  </p>
+                ) : (
+                  <div className="mx-2 mb-2 border-t border-sidebar-border" />
+                ))}
+              {modules.map(renderAdminModule)}
+            </div>
+          ))}
         </nav>
 
       </aside>
