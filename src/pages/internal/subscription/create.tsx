@@ -213,7 +213,8 @@ export default function SubscriptionCreatePage() {
                 name: subscriptionData.name || '',
                 subtitle: subscriptionData.subtitle || '',
                 description: subscriptionData.description || '',
-                amount: Number(subscriptionData.amount) || 0,
+                // Stored in paise (what Razorpay bills); the form edits rupees.
+                amount: (Number(subscriptionData.amount) || 0) / 100,
                 yearly_discount: subscriptionData.yearly_discount || 0,
                 razorpay_monthly_plan_id: subscriptionData.razorpay_monthly_plan_id || '',
                 razorpay_yearly_plan_id: subscriptionData.razorpay_yearly_plan_id || '',
@@ -309,7 +310,7 @@ export default function SubscriptionCreatePage() {
             name: data.name,
             subtitle: data.subtitle,
             description: data.description,
-            amount: Number(data.amount),
+            amount: Math.round(Number(data.amount) * 100),
             yearly_discount: Number(data.yearly_discount),
             razorpay_monthly_plan_id: data.razorpay_monthly_plan_id || null,
             razorpay_yearly_plan_id: data.razorpay_yearly_plan_id || null,
