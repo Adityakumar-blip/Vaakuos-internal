@@ -127,7 +127,8 @@ export default function SubscriptionAddonCreatePage() {
                 name: addon.name,
                 description: addon.description || '',
                 type: addon.type || 'recurring',
-                amount: addon.amount || 0,
+                // Stored in paise (what Razorpay bills); the form edits rupees.
+                amount: (addon.amount || 0) / 100,
                 is_active: addon.is_active,
             });
 
@@ -210,6 +211,7 @@ export default function SubscriptionAddonCreatePage() {
 
             const payload = {
                 ...data,
+                amount: Math.round(Number(data.amount) * 100),
                 features: featuresMap,
             };
 
@@ -411,7 +413,7 @@ export default function SubscriptionAddonCreatePage() {
                             <Card>
                                 <CardContent className="p-6 space-y-6">
                                     <div className="space-y-2">
-                                        <Label htmlFor="amount">Amount <span className="text-destructive">*</span></Label>
+                                        <Label htmlFor="amount">Amount (₹) <span className="text-destructive">*</span></Label>
                                         <Input
                                             id="amount"
                                             type="number"
