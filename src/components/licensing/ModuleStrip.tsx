@@ -1,5 +1,7 @@
 import { cn } from '@/lib/utils';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { modulesUnset, type ModuleSlot } from './modules';
+import { ModuleRoster } from './ModuleRoster';
 
 interface ModuleStripProps {
     slots: ModuleSlot[];
@@ -30,21 +32,14 @@ export function ModuleStrip({ slots, variant = 'bare', className }: ModuleStripP
               granted.map((s) => s.label).join(', ') || 'none'
           }`;
 
-    return (
+    const strip = (
         <div className={cn('flex items-center gap-2', className)}>
-            <div className="flex items-center gap-[2px]" role="img" aria-label={summary}>
+            <div className="flex items-center gap-[3px]" role="img" aria-label={summary}>
                 {slots.map((s) => (
                     <span
                         key={s.key}
-                        title={
-                            s.state === 'unset'
-                                ? `${s.label} — not set`
-                                : `${s.label}${s.state === 'locked' ? ' — locked' : ''}${
-                                      s.overridden ? ' (override)' : ''
-                                  }`
-                        }
                         className={cn(
-                            'h-3 w-[6px] rounded-[1px]',
+                            'h-4 w-1.5 rounded-sm',
                             s.state === 'granted' &&
                                 (s.overridden ? 'bg-[hsl(var(--brand-secondary))]' : 'bg-primary'),
                             s.state === 'locked' && 'bg-transparent ring-1 ring-inset ring-border',
@@ -64,5 +59,25 @@ export function ModuleStrip({ slots, variant = 'bare', className }: ModuleStripP
                 )
             )}
         </div>
+    );
+
+    return (
+        <HoverCard openDelay={180} closeDelay={80}>
+            <HoverCardTrigger asChild>
+                <button
+                    type="button"
+                    className="rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {strip}
+                </button>
+            </HoverCardTrigger>
+            <HoverCardContent align="start" className="w-64 p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
+                    Modules
+                </p>
+                <ModuleRoster slots={slots} />
+            </HoverCardContent>
+        </HoverCard>
     );
 }
