@@ -212,6 +212,9 @@ export const apiSlice = createApi({
     "Offer",
     "ApiKey",
     "Waba",
+    "LegalPage",
+    "ContactQuery",
+    "DemoBooking",
   ],
 
   // Endpoints will be injected in separate files
