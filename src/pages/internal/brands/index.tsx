@@ -25,11 +25,11 @@ import { DataTable, type Column } from '@/components/ui/data-table';
 import { RowActions, TableHeader } from '@/components/table';
 import { Pill } from '@/components/ui/pill';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { formatDate } from '@/utils/format';
-import { useGetBrandsQuery, useRevokeLicenceMutation } from '@/store/api/brandApi';
+import { useGetBrandsQuery, useRevokeLicenceMutation, useSetModuleAccessMutation } from '@/store/api/brandApi';
 import { ModuleStrip } from '@/components/licensing/ModuleStrip';
-import { ModuleRoster } from '@/components/licensing/ModuleRoster';
 import { resolveSlots, useModuleSlots, type ModuleSlot } from '@/components/licensing/modules';
 import type { BrandOverview } from '@/types/owner.types';
 import type { PillTone } from '@/components/ui/pill';
@@ -110,6 +110,7 @@ export default function BrandsManagement() {
     const moduleSlots = useModuleSlots();
     const { data, isLoading } = useGetBrandsQuery();
     const [revoke, { isLoading: isRevoking }] = useRevokeLicenceMutation();
+    const [setModuleAccess, { isLoading: isSavingModules }] = useSetModuleAccessMutation();
 
     const [query, setQuery] = useState('');
     const [pageSize, setPageSize] = useState(10);
@@ -162,6 +163,16 @@ export default function BrandsManagement() {
             setReason('');
         } catch {
             toast.error('Could not revoke the licence. Try again.');
+        }
+    };
+
+    const toggleModule = async (key: string, value: boolean | null) => {
+        if (!inspecting) return;
+        try {
+            const res = await setModuleAccess({ tenant_id: inspecting.id, modules: { [key]: value } }).unwrap();
+            setInspecting({ ...inspecting, customLimits: res.custom_limits });
+        } catch {
+            toast.error('Could not update the menu. Try again.');
         }
     };
 
@@ -472,14 +483,38 @@ export default function BrandsManagement() {
 
                                 <div>
                                     <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-3">
-                                        Modules on this licence
+                                        Sidebar menu
                                     </p>
                                     {inspectingKind === 'none' ? (
                                         <p className="text-sm text-muted-foreground">
                                             Give this brand a licence to decide which modules they can use.
                                         </p>
                                     ) : (
-                                        <ModuleRoster slots={inspectingSlots} />
+                                        <ul className="space-y-1">
+                                            {inspectingSlots.map((s) => (
+                                                <li key={s.key} className="flex items-center gap-3 text-sm min-h-8">
+                                                    <span className={cn('flex-1 truncate', !s.granted && 'text-muted-foreground')}>
+                                                        {s.label}
+                                                    </span>
+                                                    {s.overridden && (
+                                                        <button
+                                                            type="button"
+                                                            className="text-[11px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+                                                            disabled={isSavingModules}
+                                                            onClick={() => toggleModule(s.key, null)}
+                                                        >
+                                                            Reset to plan
+                                                        </button>
+                                                    )}
+                                                    <Switch
+                                                        checked={s.granted}
+                                                        disabled={isSavingModules}
+                                                        aria-label={`Show ${s.label} in ${inspecting.name}'s sidebar`}
+                                                        onCheckedChange={(on) => toggleModule(s.key, on)}
+                                                    />
+                                                </li>
+                                            ))}
+                                        </ul>
                                     )}
                                 </div>
                             </div>

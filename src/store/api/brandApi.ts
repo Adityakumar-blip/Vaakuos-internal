@@ -59,6 +59,19 @@ export const brandApi = api.injectEndpoints({
             invalidatesTags: [{ type: 'Brand', id: 'LIST' }],
         }),
 
+        // Show/hide modules (and so sidebar entries) for one brand; null resets to the plan.
+        setModuleAccess: builder.mutation<
+            { tenant_id: string; custom_limits: Record<string, string | number | boolean> },
+            { tenant_id: string; modules: Record<string, boolean | null> }
+        >({
+            query: (body) => ({
+                url: '/subscriptions/licences/modules',
+                method: 'PATCH',
+                body,
+            }),
+            invalidatesTags: [{ type: 'Brand', id: 'LIST' }],
+        }),
+
         // Get brand by ID
         getBrandById: builder.query<Brand, string>({
             query: (id) => `/brands/${id}`,
@@ -88,4 +101,5 @@ export const {
     useUpdateBrandMutation,
     useAssignLicenceMutation,
     useRevokeLicenceMutation,
+    useSetModuleAccessMutation,
 } = brandApi;
