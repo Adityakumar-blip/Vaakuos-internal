@@ -37,6 +37,7 @@ export const brandApi = api.injectEndpoints({
             {
                 tenant_id: string;
                 plan_id: string;
+                billing_cycle: 'monthly' | 'yearly';
                 custom_limits?: Record<string, number | boolean | string>;
                 note?: string;
             }

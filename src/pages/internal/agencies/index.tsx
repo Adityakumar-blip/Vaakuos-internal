@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +9,7 @@ import { Building, DollarSign, TrendingUp, Users, Loader2, RotateCcw } from 'luc
 import { formatCurrency } from '@/utils/format';
 
 export default function AgenciesManagement() {
+    const navigate = useNavigate();
     const { data: agencies = [], isLoading, error, refetch } = useGetAgenciesQuery();
 
     const totalRevenue = useMemo(() => 
@@ -164,6 +166,9 @@ export default function AgenciesManagement() {
                                     </CardDescription>
                                 </div>
                                 <div className="flex gap-2">
+                                    <Button variant="outline" size="sm" onClick={() => navigate(`/subscription/issue-licence?tenant=${agency.id}`)}>
+                                        Issue licence
+                                    </Button>
                                     <Button variant="outline" size="sm">View Details</Button>
                                     <Button variant="outline" size="sm">Manage</Button>
                                 </div>

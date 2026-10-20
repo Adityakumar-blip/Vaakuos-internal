@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, Check, Globe, Loader2, Lock, Plus, X } from 'lucide-react';
+import { ArrowLeft, Check, Globe, Loader2, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useGetMastersQuery } from '@/store/api/mastersApi';
 import { useGetBrandsQuery, useAssignLicenceMutation } from '@/store/api/brandApi';
+import { useGetAgenciesQuery } from '@/store/api/agencyApi';
 import { ModuleStrip } from '@/components/licensing/ModuleStrip';
 import { modulesUnset, resolveSlots, useModuleSlots } from '@/components/licensing/modules';
 import { formatCurrency } from '@/utils/format';
@@ -28,6 +29,7 @@ interface Plan {
     id: string;
     name: string;
     amount: number;
+    yearly_discount?: number;
     is_published?: boolean;
     is_active?: boolean;
     features?: Record<string, string | number | boolean>;
@@ -44,6 +46,7 @@ interface FeatureOption {
 interface Tenant {
     id: string;
     name: string;
+    type: 'brand' | 'agency';
     status?: string;
     planName?: string;
 }
@@ -89,21 +92,33 @@ export default function IssueLicencePage() {
     // Arriving from a brand row means the tenant is already decided.
     const [tenantId, setTenantId] = useState(searchParams.get('tenant') ?? '');
     const [planId, setPlanId] = useState('');
+    const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
     const [overrides, setOverrides] = useState<Record<string, string | boolean>>({});
     const [note, setNote] = useState('');
 
-    const { data: brandsData, isLoading: loadingTenants } = useGetBrandsQuery();
+    const { data: brandsData, isLoading: loadingBrands } = useGetBrandsQuery();
+    const { data: agenciesData, isLoading: loadingAgencies } = useGetAgenciesQuery();
     const { data: plansData } = useGetMastersQuery({ url: PLANS_URL, params: '?limit=100' });
     const { data: featuresData } = useGetMastersQuery({ url: FEATURES_DROPDOWN_URL });
     const [assign, { isLoading: isIssuing }] = useAssignLicenceMutation();
 
-    const tenants = (brandsData ?? NO_TENANTS) as unknown as Tenant[];
-    const plans = unwrap<Plan>(plansData).filter((p) => p.is_active !== false);
+    const tenants: Tenant[] = [
+        ...((brandsData ?? NO_TENANTS) as unknown as Tenant[]).map((brand) => ({ ...brand, type: 'brand' as const })),
+        ...((agenciesData ?? NO_TENANTS) as unknown as Tenant[]).map((agency) => ({ ...agency, type: 'agency' as const })),
+    ];
+    const loadingTenants = loadingBrands || loadingAgencies;
+    const allPlans = unwrap<Plan>(plansData);
+    const plans = allPlans.filter((p) => p.is_active === true && p.is_published === true);
     const features = unwrap<FeatureOption>(featuresData);
 
     const tenant = tenants.find((t) => t.id === tenantId);
     const plan = plans.find((p) => p.id === planId);
-    const currentPlan = plans.find((p) => p.name === tenant?.planName);
+    const currentPlan = allPlans.find((p) => p.name === tenant?.planName);
+    const selectedPrice = plan
+        ? billingCycle === 'yearly'
+            ? Math.round(plan.amount * 12 * (1 - (plan.yearly_discount ?? 0) / 100))
+            : plan.amount
+        : 0;
 
     const before = resolveSlots(moduleSlots, currentPlan?.features);
     const after = resolveSlots(moduleSlots, plan?.features, overrides);
@@ -145,13 +160,15 @@ export default function IssueLicencePage() {
             await assign({
                 tenant_id: tenantId,
                 plan_id: planId,
+                billing_cycle: billingCycle,
                 custom_limits: custom,
                 note: note.trim() || undefined,
             }).unwrap();
-            toast.success(`${plan?.name} issued to ${tenant?.name}`);
-            navigate('/brands');
-        } catch {
-            toast.error('Could not issue the licence. Check the overrides and try again.');
+            toast.success(`${plan?.name} issued to ${tenant?.name} for one ${billingCycle === 'yearly' ? 'year' : 'month'}`);
+            navigate(tenant?.type === 'agency' ? '/agencies' : '/brands');
+        } catch (error: unknown) {
+            const message = (error as { data?: { message?: string } })?.data?.message;
+            toast.error(message || 'Could not issue the licence. Check the overrides and try again.');
         }
     };
 
@@ -164,8 +181,8 @@ export default function IssueLicencePage() {
                 <div>
                     <h1 className="text-2xl font-semibold text-foreground">Issue a licence</h1>
                     <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-                        Grant a plan to one tenant straight away. Private licences never appear on
-                        the pricing page, so this is the only way they reach a customer.
+                        Assign a published plan to a brand or agency after receiving payment directly.
+                        Choose the billing term that determines when access ends.
                     </p>
                 </div>
             </div>
@@ -191,7 +208,7 @@ export default function IssueLicencePage() {
                         <SelectContent>
                             {tenants.map((t) => (
                                 <SelectItem key={t.id} value={t.id}>
-                                    {t.name}
+                                    {t.type === 'agency' ? 'Agency' : 'Brand'} · {t.name}
                                     {t.planName ? ` · ${t.planName}` : ' · no plan'}
                                 </SelectItem>
                             ))}
@@ -206,10 +223,22 @@ export default function IssueLicencePage() {
                     <div className="px-4 py-3 border-b border-border">
                         <Label className="text-sm">Licence</Label>
                     </div>
+                    <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3">
+                        <Label htmlFor="billing-cycle" className="text-sm">Billing term</Label>
+                        <Select value={billingCycle} onValueChange={(value: 'monthly' | 'yearly') => setBillingCycle(value)}>
+                            <SelectTrigger id="billing-cycle" className="w-36">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="monthly">Monthly</SelectItem>
+                                <SelectItem value="yearly">Yearly</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                     <div className="divide-y divide-border">
                         {plans.length === 0 && (
                             <p className="text-sm text-muted-foreground px-4 py-10 text-center">
-                                No plans yet. Create one, then come back.
+                                No published plans are available. Publish a plan first.
                             </p>
                         )}
                         {plans.map((p) => {
@@ -238,11 +267,7 @@ export default function IssueLicencePage() {
                                     <span className="flex-1 min-w-0 space-y-1.5">
                                         <span className="flex items-center gap-2">
                                             <span className="text-sm font-medium truncate">{p.name}</span>
-                                            {p.is_published ? (
-                                                <Globe size={11} className="text-primary shrink-0" />
-                                            ) : (
-                                                <Lock size={11} className="text-muted-foreground shrink-0" />
-                                            )}
+                                            <Globe size={11} className="text-primary shrink-0" />
                                         </span>
                                         <ModuleStrip slots={slots} />
                                         {limits.length > 0 && (
@@ -253,7 +278,10 @@ export default function IssueLicencePage() {
                                     </span>
 
                                     <span className="font-mono text-sm tabular-nums shrink-0">
-                                        {formatCurrency(p.amount)}
+                                        {formatCurrency(billingCycle === 'yearly'
+                                            ? Math.round(p.amount * 12 * (1 - (p.yearly_discount ?? 0) / 100))
+                                            : p.amount)}
+                                        <span className="text-xs text-muted-foreground">/{billingCycle === 'yearly' ? 'yr' : 'mo'}</span>
                                     </span>
                                 </button>
                             );
@@ -284,7 +312,7 @@ export default function IssueLicencePage() {
                                     <span className="w-11 text-xs text-muted-foreground shrink-0">After</span>
                                     <span className="text-sm truncate flex-1">{plan.name}</span>
                                     <span className="font-mono text-sm tabular-nums">
-                                        {formatCurrency(plan.amount)}
+                                        {formatCurrency(selectedPrice)}/{billingCycle === 'yearly' ? 'yr' : 'mo'}
                                     </span>
                                 </div>
                             </div>
@@ -401,7 +429,7 @@ export default function IssueLicencePage() {
                                 Issue licence
                             </Button>
                             <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
-                                Applies immediately. Overrides replace any the tenant already has.
+                                Starts immediately and ends after one {billingCycle === 'yearly' ? 'year' : 'month'}. Overrides replace any the tenant already has.
                             </p>
                         </div>
                     )}
